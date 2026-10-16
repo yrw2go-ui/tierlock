@@ -1,0 +1,1013 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Tierlock</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: guide panel on the left, a live device frame on the right; stacks on narrow screens. */
+:root{
+  --bg:#ECEFF3; --surface:#FFFFFF; --ink:#151D2B; --muted:#586377; --line:#D3D9E2;
+  --accent:#8F6418; --accent-ink:#FFFFFF; --accent-soft:#F2E5CB;
+  --l1:#8F6418; --l2:#12706A; --l3:#4752B0; --l4:#636B78;
+  --ok:#1D7443; --bad:#AF3229; --warn:#9A5B00;
+  --frame:#1A212E; --scr:#F6F7F9; --scr-card:#FFFFFF; --scr-line:#E1E5EB;
+  --f-display:"Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --f-body:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono:"IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0F131A; --surface:#171D27; --ink:#E6E9EF; --muted:#9AA3B3; --line:#2A3240;
+  --accent:#D8A64C; --accent-ink:#1A1408; --accent-soft:#382C16;
+  --l1:#D8A64C; --l2:#40B7AC; --l3:#8F99EE; --l4:#9AA1AD;
+  --ok:#4DC07D; --bad:#EE746A; --warn:#E6A13A;
+  --frame:#04060A; --scr:#0D1118; --scr-card:#171D27; --scr-line:#262E3B; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0F131A; --surface:#171D27; --ink:#E6E9EF; --muted:#9AA3B3; --line:#2A3240;
+  --accent:#D8A64C; --accent-ink:#1A1408; --accent-soft:#382C16;
+  --l1:#D8A64C; --l2:#40B7AC; --l3:#8F99EE; --l4:#9AA1AD;
+  --ok:#4DC07D; --bad:#EE746A; --warn:#E6A13A;
+  --frame:#04060A; --scr:#0D1118; --scr-card:#171D27; --scr-line:#262E3B; color-scheme:dark}
+
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:24px}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1240px;margin:0 auto;display:grid;grid-template-columns:300px minmax(0,1fr);gap:32px;align-items:start}
+@media (max-width:1000px){.wrap{grid-template-columns:minmax(0,1fr)}}
+
+/* Guide panel */
+.guide{display:flex;flex-direction:column;gap:20px;min-width:0}
+.eyebrow{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+h1{font-family:var(--f-display);font-size:40px;line-height:1;margin:4px 0 8px;letter-spacing:-.02em;text-wrap:balance}
+.guide p{margin:0;color:var(--muted);max-width:60ch}
+.ladder{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;background:var(--surface);overflow:hidden}
+.rung{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;padding:9px 12px;border-top:1px solid var(--line)}
+.rung:first-child{border-top:0}
+.rung .n{font-family:var(--f-mono);font-size:12px;width:24px;height:24px;border-radius:6px;display:grid;place-items:center;color:var(--surface);background:var(--lc)}
+.rung b{font-weight:600}
+.rung span.d{color:var(--muted);font-size:12px}
+.rung code{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.ctl{display:flex;flex-direction:column;gap:8px}
+.ctl label{font-weight:600;font-size:13px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;padding:2px;background:var(--surface);gap:2px;flex-wrap:wrap}
+.seg button{border:0;background:none;padding:6px 12px;border-radius:6px;font-size:13px}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.timev{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+ol.try{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;color:var(--ink)}
+ol.try li::marker{color:var(--accent);font-family:var(--f-mono)}
+.btn-ghost{align-self:flex-start;border:1px solid var(--line);background:var(--surface);padding:7px 14px;border-radius:8px}
+
+/* Device */
+.stage{display:flex;justify-content:center;min-width:0}
+#device{background:var(--frame);padding:11px;border-radius:44px;box-shadow:0 30px 60px -30px rgba(10,15,25,.45);transition:width .3s,height .3s,border-radius .3s;max-width:100%}
+#device.phone{width:350px;height:690px}
+#device.tablet{width:900px;height:620px;border-radius:30px}
+@media (max-width:420px){#device.phone{width:100%}}
+@media (prefers-reduced-motion:reduce){#device{transition:none}}
+#screen{position:relative;height:100%;border-radius:34px;background:var(--scr);overflow:hidden;display:flex;flex-direction:column}
+#device.tablet #screen{border-radius:20px}
+.status{display:flex;justify-content:space-between;align-items:center;padding:10px 22px 4px;font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;flex:none}
+.status .who{display:flex;align-items:center;gap:6px;font-weight:500;color:var(--muted)}
+.content{flex:1;overflow:auto;padding:12px 18px 18px;display:flex;flex-direction:column;gap:14px;min-height:0}
+
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;color:var(--lc);border:1px solid var(--lc);white-space:nowrap}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--lc)}
+.av{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-family:var(--f-display);font-weight:700;background:var(--scr-card);border:2px solid var(--lc);flex:none}
+.L1{--lc:var(--l1)}.L2{--lc:var(--l2)}.L3{--lc:var(--l3)}.L4{--lc:var(--l4)}
+
+/* Lock screen */
+.lock{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center}
+.lock .big{font-family:var(--f-display);font-size:56px;line-height:1;font-variant-numeric:tabular-nums}
+.lock h2{font-family:var(--f-display);font-size:18px;margin:0}
+.who-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;width:100%;max-width:300px}
+#device.tablet .who-grid{grid-template-columns:repeat(4,minmax(0,1fr));max-width:560px}
+.who-btn{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 8px;border:1px solid var(--scr-line);background:var(--scr-card);border-radius:14px}
+.who-btn .av{width:48px;height:48px;font-size:18px}
+.pin-dots{display:flex;gap:12px;justify-content:center}
+.pin-dots i{width:12px;height:12px;border-radius:50%;border:2px solid var(--ink)}
+.pin-dots i.on{background:var(--ink)}
+.pin-dots.err i{border-color:var(--bad)}
+.pad{display:grid;grid-template-columns:repeat(3,64px);gap:12px;justify-content:center}
+.pad button{height:64px;border-radius:50%;border:1px solid var(--scr-line);background:var(--scr-card);font-size:22px;font-family:var(--f-display)}
+.pad button.txt{border:0;background:none;font-size:13px;font-family:var(--f-body);color:var(--muted)}
+.hint{font-size:12px;color:var(--muted)}
+.err-t{color:var(--bad);font-size:13px;min-height:18px}
+
+/* Home */
+.hello{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.hello h2{font-family:var(--f-display);font-size:22px;margin:0}
+.meter{background:var(--scr-card);border:1px solid var(--scr-line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.meter .row{display:flex;justify-content:space-between;font-size:12px;font-variant-numeric:tabular-nums;gap:8px}
+.bar{height:6px;border-radius:3px;background:var(--scr-line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent)}
+.bar.over i{background:var(--bad)}
+.banner{border-radius:12px;padding:10px 12px;font-size:13px;background:var(--accent-soft);color:var(--ink)}
+.banner b{display:block}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px 8px}
+#device.tablet .grid{grid-template-columns:repeat(8,minmax(0,1fr))}
+.app{display:flex;flex-direction:column;align-items:center;gap:5px;border:0;background:none;padding:0;font-size:11px;position:relative;min-width:0}
+.app .ic{width:54px;height:54px;border-radius:15px;display:grid;place-items:center;color:#fff;font-family:var(--f-display);font-weight:700;font-size:17px;background:hsl(var(--h) var(--s,52%) 44%)}
+.app.locked .ic{filter:grayscale(.85);opacity:.45}
+.app.locked span.nm{color:var(--muted)}
+.app .lk{position:absolute;top:-4px;right:calc(50% - 33px);width:20px;height:20px;border-radius:50%;background:var(--ink);color:var(--scr);display:grid;place-items:center}
+.app .lk svg{width:11px;height:11px}
+.app .ic.ctrl{background:var(--accent);color:var(--accent-ink)}
+.app span.nm{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.home{gap:10px}
+.topline{display:flex;justify-content:space-between;align-items:center;gap:8px;min-height:32px}
+.topline .hi{font-family:var(--f-display);font-size:20px;font-weight:700}
+.home.kids .topline .hi{font-size:26px}
+.tools{display:flex;gap:6px}
+.tbtn{width:32px;height:32px;border-radius:50%;border:0;background:color-mix(in srgb,var(--scr-card) 75%,transparent);display:grid;place-items:center}
+.tbtn svg{width:17px;height:17px}
+.pages{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;flex:1;min-height:0;touch-action:pan-x pan-y;overscroll-behavior-x:contain}
+.pages::-webkit-scrollbar{display:none}
+.page{flex:0 0 100%;scroll-snap-align:start;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:min-content;gap:16px 8px;align-content:start;padding-top:6px}
+#device.tablet .page{grid-template-columns:repeat(8,minmax(0,1fr))}
+.kids .page{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 10px}
+#device.tablet .kids .page{grid-template-columns:repeat(6,minmax(0,1fr))}
+.kids .page .app{font-size:14px;font-weight:600}
+.kids .page .app .ic{width:66px;height:66px;border-radius:21px;font-size:21px}
+.kids .page .app .lk{right:calc(50% - 44px)}
+.dots{display:flex;justify-content:center;gap:4px}
+.dots button{width:22px;height:22px;border:0;background:none;padding:0;display:grid;place-items:center}
+.dots button::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--muted);opacity:.45}
+.dots button.on::before{opacity:1;background:var(--ink)}
+.dock{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;padding:10px 6px;border-radius:26px;background:color-mix(in srgb,var(--scr-card) 70%,transparent);border:1px solid var(--scr-line)}
+.dock .nm{display:none}
+#screen.pic{background-size:cover;background-position:center}
+#screen.pic .status,#screen.pic .topline .hi,#screen.pic .app span.nm,#screen.pic .kfoot button{color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.65)}
+#screen.pic .kfoot button{border-color:rgba(255,255,255,.7)}
+#screen.pic .dots button::before{background:#fff}
+#screen.pic .dock{background:rgba(255,255,255,.22);border-color:rgba(255,255,255,.25);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+#screen.pic .topline .chip{background:var(--scr-card)}
+.walls{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.wsw{aspect-ratio:9/16;max-width:100%;border-radius:10px;border:2px solid transparent;cursor:pointer}
+.wsw.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--scr-card) inset}
+.wsw.photo{background-size:cover;background-position:center}
+.sheet-row{display:flex;gap:8px;flex-wrap:wrap}
+label.btn{cursor:pointer;display:inline-flex;align-items:center}
+
+/* Opened app */
+.apphead{display:flex;align-items:center;gap:10px}
+.back{border:0;background:none;color:var(--accent);font-weight:600;padding:4px 0;display:inline-flex;align-items:center;gap:2px}
+.appbody{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;color:var(--muted)}
+.appbody .ic{width:80px;height:80px;border-radius:22px;display:grid;place-items:center;color:#fff;font-family:var(--f-display);font-weight:700;font-size:26px;background:hsl(var(--h) var(--s,52%) 44%)}
+.appbody h3{margin:0;color:var(--ink);font-family:var(--f-display);font-size:20px}
+
+/* Controls */
+.controls{flex:1;display:grid;grid-template-rows:minmax(0,1fr) auto;min-height:0}
+.ctl-main{overflow:auto;padding:12px 18px 18px;display:flex;flex-direction:column;gap:14px;min-height:0}
+.tabs{display:flex;border-top:1px solid var(--scr-line);background:var(--scr-card)}
+.tabs button{flex:1;border:0;background:none;padding:10px 4px 12px;font-size:12px;font-weight:500;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px;position:relative}
+.tabs button[aria-current="true"]{color:var(--accent)}
+.tabs svg{width:18px;height:18px}
+.badge{position:absolute;top:5px;left:calc(50% + 6px);background:var(--bad);color:#fff;font-size:10px;border-radius:999px;padding:0 5px;line-height:16px;font-variant-numeric:tabular-nums}
+#device.tablet .controls{grid-template-rows:none;grid-template-columns:190px minmax(0,1fr)}
+#device.tablet .tabs{order:-1;flex-direction:column;border-top:0;border-right:1px solid var(--scr-line);padding:12px 8px;gap:2px}
+#device.tablet .tabs button{flex:none;flex-direction:row;justify-content:flex-start;gap:10px;padding:10px 12px;border-radius:8px;font-size:13px}
+#device.tablet .tabs button[aria-current="true"]{background:var(--accent-soft);color:var(--ink)}
+#device.tablet .badge{position:static;margin-left:auto}
+.ctl-title{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.ctl-title h2{font-family:var(--f-display);font-size:22px;margin:0}
+.group h4{margin:0 0 6px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.list{background:var(--scr-card);border:1px solid var(--scr-line);border-radius:12px;overflow:hidden}
+.item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-top:1px solid var(--scr-line);width:100%;background:none;border-left:0;border-right:0;border-bottom:0;text-align:left}
+.item:first-child{border-top:0}
+.item .grow{flex:1;min-width:0}
+.item .sub{font-size:12px;color:var(--muted)}
+.item .end{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:4px;white-space:nowrap}
+.item .end svg{width:12px;height:12px}
+button.item:hover{background:var(--scr)}
+.mini{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;color:#fff;font-family:var(--f-display);font-weight:700;font-size:12px;background:hsl(var(--h) var(--s,52%) 44%);flex:none}
+.sw{width:42px;height:24px;border-radius:12px;background:var(--scr-line);border:0;position:relative;flex:none;padding:0}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--scr-card);box-shadow:0 1px 2px rgba(0,0,0,.25);transition:left .15s}
+.sw[aria-checked="true"]{background:var(--ok)}
+.sw[aria-checked="true"]::after{left:21px}
+.sw:disabled{opacity:.4;cursor:not-allowed}
+.stepper{display:flex;align-items:center;gap:8px}
+.stepper button{width:30px;height:30px;border-radius:8px;border:1px solid var(--scr-line);background:var(--scr)}
+.stepper output{min-width:64px;text-align:center;font-variant-numeric:tabular-nums;font-weight:600}
+.item select{border:1px solid var(--scr-line);background:var(--scr);border-radius:6px;padding:3px 4px}
+.rules-cols{display:grid;gap:14px}
+#device.tablet .rules-cols{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+.req-actions{display:flex;gap:8px}
+.btn{border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;border:1px solid var(--scr-line);background:var(--scr)}
+.btn.pri{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.st{font-size:12px;font-weight:600}
+.st.ok{color:var(--ok)}.st.bad{color:var(--bad)}
+.empty{padding:18px;text-align:center;color:var(--muted);font-size:13px}
+.note{font-size:12px;color:var(--muted)}
+.t{font-family:var(--f-mono);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;width:56px;flex:none}
+
+/* Sheet + toast */
+.scrim{position:absolute;inset:0;background:rgba(5,8,14,.45);display:flex;align-items:flex-end;justify-content:center;z-index:5}
+.sheet{background:var(--scr-card);width:100%;max-width:440px;border-radius:22px 22px 0 0;padding:20px 20px 24px;display:flex;flex-direction:column;gap:12px}
+#device.tablet .scrim{align-items:center}
+#device.tablet .sheet{border-radius:18px}
+.sheet h3{margin:0;font-family:var(--f-display);font-size:20px;display:flex;align-items:center;gap:10px}
+.sheet p{margin:0;color:var(--muted)}
+.opts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.opts .btn{padding:10px 6px}
+#screen.walled{background:color-mix(in srgb,hsl(var(--wh) 70% 50%) 9%,var(--scr))}
+#screen.kidswall{background:color-mix(in srgb,hsl(var(--wh) 80% 55%) 22%,var(--scr))}
+.item.wrap{flex-wrap:wrap}.item.wrap .grow{flex-basis:100%}
+.scan{width:96px;height:96px;border-radius:50%;border:2px solid var(--accent);background:var(--scr-card);color:var(--accent);display:grid;place-items:center}
+.scan svg{width:52px;height:52px}
+.scan.busy{animation:pulse .9s ease-in-out infinite}
+@keyframes pulse{50%{transform:scale(.92);opacity:.6}}
+@media (prefers-reduced-motion:reduce){.scan.busy{animation:none}}
+.linkbtn{border:0;background:none;color:var(--accent);font-weight:600;padding:4px}
+.kids h2{font-family:var(--f-display);font-size:28px;margin:0}
+.kfoot{margin-top:auto;display:flex;justify-content:center}
+.kfoot button{border:1px dashed var(--muted);background:none;border-radius:999px;padding:6px 14px;font-size:12px;color:var(--muted)}
+.velo{display:flex;gap:10px;align-items:flex-start;background:var(--scr-card);border:1px solid var(--scr-line);border-radius:14px;padding:10px 12px}
+.vav{width:30px;height:30px;border-radius:50%;flex:none;display:grid;place-items:center;font-family:var(--f-display);font-weight:700;color:var(--accent-ink);background:var(--accent)}
+.velo .vb{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.velo .vb>b{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.vline{display:flex;gap:8px;align-items:center;justify-content:space-between;font-size:13px}
+.vline span{min-width:0}
+.vline .btn{padding:4px 10px;font-size:12px;flex:none}
+.task{background:var(--scr-card);border:1px solid var(--scr-line);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.task h3{margin:0;font-family:var(--f-display);font-size:18px}
+.task .meta{display:flex;gap:6px;flex-wrap:wrap}
+.tag{font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--scr);border:1px solid var(--scr-line)}
+.tag.warn{color:var(--warn);border-color:var(--warn)}.tag.ok{color:var(--ok);border-color:var(--ok)}.tag.bad{color:var(--bad);border-color:var(--bad)}
+.thumbs{display:flex;gap:6px;flex-wrap:wrap}
+.thumbs img{width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--scr-line)}
+.row-btns{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+#screen.pic .home>.note{color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.65)}
+.field{box-sizing:border-box;border:1px solid var(--scr-line);background:var(--scr);border-radius:8px;padding:7px 10px;width:100%;min-width:0}
+.formgrid{display:flex;flex-direction:column;gap:10px;padding:12px}
+.formgrid label.lab{font-size:12px;font-weight:600;color:var(--muted)}
+.chiprow{display:flex;gap:6px;flex-wrap:wrap}
+.chiprow button{border:1px solid var(--scr-line);background:var(--scr);border-radius:999px;padding:3px 10px;font-size:12px}
+.kw{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--scr-line);background:var(--scr);border-radius:999px;padding:2px 4px 2px 10px;font-size:12px}
+.kw button{border:0;background:none;width:18px;height:18px;border-radius:50%;padding:0;color:var(--muted)}
+.inrow{display:flex;gap:8px;align-items:center;width:100%}
+.thread{flex:1;display:flex;flex-direction:column;gap:6px;overflow:auto;min-height:0;padding:4px 0}
+.bub{max-width:78%;padding:7px 11px;border-radius:16px;font-size:13px;background:var(--scr-card);border:1px solid var(--scr-line);align-self:flex-start}
+.bub.me{align-self:flex-end;background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.bub img{display:block;max-width:160px;border-radius:10px}
+.bub .tm{display:block;font-size:10px;opacity:.7;margin-top:2px}
+.comm{align-items:flex-start}
+.comm .kind{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;width:44px;flex:none;padding-top:2px;color:var(--muted)}
+.comm .kind.bad{color:var(--bad)}
+.comm img{width:72px;height:52px;object-fit:cover;border-radius:6px;margin-top:4px;display:block}
+.day{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:4px}
+.result{padding:10px 12px;border-top:1px solid var(--scr-line);font-size:13px}
+.result:first-child{border-top:0}
+.result b{display:block;color:var(--l3)}
+.toast{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:var(--scr);padding:9px 14px;border-radius:10px;font-size:13px;z-index:6;width:max-content;max-width:calc(100% - 32px);text-align:center}
+</style>
+
+<div class="wrap">
+  <aside class="guide">
+    <div>
+      <div class="eyebrow">Concept prototype</div>
+      <h1>Tierlock</h1>
+      <p>Four levels of access on one shared phone or tablet. Parents set rules, send chores that unlock screen time, approve requests and see calls and texts. Velo, the built-in assistant, keeps everyone on track.</p>
+    </div>
+
+    <div class="ladder" aria-label="Access levels">
+      <div class="rung L1"><span class="n">1</span><div><b>Owner</b> · Alex<br><span class="d">Full control, can't be restricted</span></div><code>1111</code></div>
+      <div class="rung L2"><span class="n">2</span><div><b>Manager</b> · Sam<br><span class="d">Manages levels 3 and 4</span></div><code>2222</code></div>
+      <div class="rung L3"><span class="n">3</span><div><b>Standard</b> · Jordan<br><span class="d">Daily use within limits</span></div><code>3333</code></div>
+      <div class="rung L4"><span class="n">4</span><div><b>Restricted</b> · Mia<br><span class="d">Kids space, face or fingerprint</span></div><code>4444</code></div>
+      <div class="rung L4"><span class="n">4</span><div><b>Restricted</b> · Guest<br><span class="d">Allowed apps only, no PIN</span></div><code>none</code></div>
+    </div>
+
+    <div class="ctl">
+      <label>Device</label>
+      <div class="seg" role="group" aria-label="Device">
+        <button id="dev-phone" data-a="device" data-v="phone" aria-pressed="true">Phone</button>
+        <button id="dev-tablet" data-a="device" data-v="tablet" aria-pressed="false">Tablet</button>
+      </div>
+    </div>
+
+    <div class="ctl">
+      <label for="hour">Device time: <span class="timev" id="hourv"></span></label>
+      <input type="range" id="hour" min="0" max="23.5" step="0.5" value="16.5">
+    </div>
+
+    <div class="ctl">
+      <label>Try this</label>
+      <ol class="try">
+        <li>Unlock as Mia (tap the fingerprint). Her tablet is locked until she cleans her room.</li>
+        <li>Add a photo (any picture works) and tap I'm done.</li>
+        <li>Grown-up exit as Alex, open Controls, then Tasks. Approve it and Mia is unlocked until bedtime.</li>
+        <li>Send a new task with a set number of hours from the Tasks tab.</li>
+        <li>As Jordan, open Messages or Phone. Only approved contacts appear. Search "casino" in Browser.</li>
+        <li>As Alex, open Chats to see texts, calls, pictures and blocked messages from the last 14 days.</li>
+        <li>Swipe Mia's home pages, change her wallpaper, and move the time past 8 pm for bedtime.</li>
+      </ol>
+    </div>
+    <button class="btn-ghost" id="reset" data-a="reset">Reset prototype</button>
+  </aside>
+
+  <main class="stage">
+    <div id="device" class="phone"><div id="screen"></div></div>
+  </main>
+</div>
+
+<script>
+const APPS=[
+  {id:'phone',name:'Phone',ab:'Ph',h:142},
+  {id:'messages',name:'Messages',ab:'Ms',h:200},
+  {id:'camera',name:'Camera',ab:'Ca',h:222,s:'14%'},
+  {id:'photos',name:'Photos',ab:'Po',h:325},
+  {id:'browser',name:'Browser',ab:'Br',h:212},
+  {id:'maps',name:'Maps',ab:'Mp',h:165},
+  {id:'music',name:'Music',ab:'Mu',h:350},
+  {id:'video',name:'Video',ab:'Vi',h:4},
+  {id:'games',name:'Games',ab:'Ga',h:268},
+  {id:'store',name:'App Store',ab:'St',h:228},
+  {id:'bank',name:'Banking',ab:'Bk',h:182},
+  {id:'settings',name:'Settings',ab:'Se',h:215,s:'8%'},
+  {id:'books',name:'Books',ab:'Bo',h:28},
+  {id:'calc',name:'Calculator',ab:'Cu',h:30,s:'10%'},
+  {id:'calendar',name:'Calendar',ab:'Cl',h:355,s:'65%'},
+  {id:'clock',name:'Clock',ab:'Ck',h:240,s:'12%'},
+  {id:'drawing',name:'Drawing',ab:'Dr',h:300},
+  {id:'notes',name:'Notes',ab:'No',h:45,s:'70%'},
+  {id:'podcasts',name:'Podcasts',ab:'Pd',h:280},
+  {id:'school',name:'School',ab:'Sc',h:190},
+  {id:'social',name:'Social',ab:'So',h:330,s:'60%'},
+  {id:'weather',name:'Weather',ab:'We',h:205}
+];
+const DOCK=['phone','messages','camera','music'];
+const WALLS=[
+  'linear-gradient(160deg,#ff9a8b 0%,#ff6a88 45%,#7b5cff 100%)',
+  'radial-gradient(circle at 28% 18%,#ffe27a 0 9%,transparent 10%),radial-gradient(ellipse at 50% 115%,#3fa34d 0 32%,transparent 33%),linear-gradient(180deg,#5ec8ff,#2a7de1 70%)',
+  'linear-gradient(200deg,#0f2027,#203a43 50%,#2c5364)',
+  'radial-gradient(circle at 70% 25%,#fff7 0 2%,transparent 3%),radial-gradient(circle at 25% 60%,#fff6 0 1.5%,transparent 2.5%),linear-gradient(135deg,#1d1b3a,#4b2a6b 55%,#c0587e)',
+  'repeating-linear-gradient(135deg,#ffd166 0 26px,#ef476f 26px 52px,#118ab2 52px 78px)'
+];
+const WALL_NAMES=['Sunset','Sunny hill','Deep sea','Night sky','Candy stripes'];
+const ALWAYS=['phone','messages'];
+const CONTACTS=[
+  {id:'alex',name:'Alex',tag:'Parent'},{id:'sam',name:'Sam',tag:'Parent'},
+  {id:'jordan',name:'Jordan',tag:'Family'},{id:'mia',name:'Mia',tag:'Family'},
+  {id:'grandma',name:'Grandma Rose',tag:'Family'},{id:'coach',name:'Coach Lee',tag:'Soccer coach'},
+  {id:'ava',name:'Ava',tag:'Friend'},{id:'tyler',name:'Tyler',tag:'Classmate'}
+];
+const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const cname=id=>(CONTACTS.find(c=>c.id===id)||{name:id}).name;
+const VIDEOS=[
+  {t:'Ocean animals for kids',r:'kids'},{t:'Lego build: city bus',r:'kids'},{t:'Draw a cartoon cat',r:'kids'},
+  {t:'Soccer skills: first touch',r:'teen'},{t:'Algebra in 10 minutes',r:'teen'},
+  {t:'Late-night horror stories',r:'all'},{t:'Extreme prank compilation',r:'all'}
+];
+const VRANK={kids:0,teen:1,all:2};
+const VNAME={kids:'Kids',teen:'Teen',all:'All'};
+const SEED_IMG='data:image/svg+xml,'+encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 110'><rect width='160' height='110' fill='#3d9a4f'/><rect x='8' y='8' width='144' height='94' fill='none' stroke='#fff' stroke-width='2'/><line x1='80' y1='8' x2='80' y2='102' stroke='#fff' stroke-width='2'/><circle cx='80' cy='55' r='14' fill='none' stroke='#fff' stroke-width='2'/><circle cx='104' cy='70' r='5' fill='#fff'/></svg>");
+const TASK_PRESETS=['Clean your room','Finish homework','Unload the dishwasher','Read for 20 minutes','Feed the dog'];
+const REWARD={lunch:'Until lunch (12 pm)',dinner:'Until dinner (6 pm)',bed:'Until bedtime',hours:'Set hours'};
+const REPLIES=['Ok!','Sounds good','See you soon','Got it, thanks','Love you too'];
+const LEVEL={1:'Owner',2:'Manager',3:'Standard',4:'Restricted'};
+const LIMITS=[0,30,60,90,120,180,240];
+const SPACE={full:'All apps',allowed:'Allowed only',kids:'Kids space'};
+const LOGIN={pin:'PIN',bio:'Face/finger',either:'Either',none:'No lock'};
+const ALL=APPS.map(a=>a.id);
+const app=id=>APPS.find(a=>a.id===id);
+
+const I={
+  lock:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="10" height="7" rx="1.5" fill="currentColor" stroke="none"/><path d="M5 7V5a3 3 0 0 1 6 0v2"/></svg>',
+  shield:'<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 2l6 2.5v5c0 4-2.7 6.8-6 8.5-3.3-1.7-6-4.5-6-8.5v-5z"/></svg>',
+  user:'<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10" cy="7" r="3.2"/><path d="M3.5 17c.8-3.2 3.4-5 6.5-5s5.7 1.8 6.5 5"/></svg>',
+  people:'<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7.5" cy="7" r="2.8"/><circle cx="14" cy="8" r="2.2"/><path d="M2 16.5c.6-2.7 2.8-4.3 5.5-4.3s4.9 1.6 5.5 4.3M13 12.4c2.3 0 4.2 1.4 4.8 3.8"/></svg>',
+  inbox:'<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11l2-7h10l2 7v5H3z"/><path d="M3 11h4l1 2h4l1-2h4"/></svg>',
+  clock:'<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10" cy="10" r="7"/><path d="M10 6v4l3 2"/></svg>',
+  home:'<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 9l7-6 7 6v8H3z"/></svg>',
+  finger:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6.5 8.5a6 6 0 0 1 11 3.3V14"/><path d="M4.5 12.5v-1a7.5 7.5 0 0 1 3-6"/><path d="M9.5 21c.8-1.8 1.2-4 1.2-6.5v-2.7a1.3 1.3 0 0 1 2.6 0V14c0 3-.6 5.3-1.6 7.2"/><path d="M7.4 19.2c.5-1.4.8-3 .8-4.8v-2.6a3.8 3.8 0 0 1 7.6 0v2.6c0 1.7-.2 3.3-.6 4.8"/><path d="M17.4 18c.2-1 .3-2 .3-3.1"/></svg>',
+  check:'<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="14" height="14" rx="3"/><path d="M6.5 10.2l2.4 2.4 4.6-5"/></svg>',
+  chat:'<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 5.5A2.5 2.5 0 0 1 5.5 3h9A2.5 2.5 0 0 1 17 5.5v6a2.5 2.5 0 0 1-2.5 2.5H9l-4 3v-3h0A2 2 0 0 1 3 12z"/></svg>',
+  image:'<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="14" height="12" rx="2"/><circle cx="8" cy="8.5" r="1.5"/><path d="M3.5 14l4-3.5 3 2.5 2.5-2 3.5 3"/></svg>',
+  chev:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3l5 5-5 5"/></svg>'
+};
+
+function initial(){return{
+  device:'phone',hour:16.5,view:'lock',page:0,user:null,pinFor:null,pin:'',pinErr:false,auth:'pin',scanning:false,exitKids:null,
+  tab:'people',editing:null,openApp:null,sheet:null,toast:null,thread:null,web:null,commFor:'all',
+  nt:{who:'mia',title:'Clean your room',note:'',photo:true,locks:true,reward:'bed',hours:2.5},
+  people:[
+    {id:'alex',name:'Alex',level:1,pin:'1111',wh:38,used:42,grants:{},earned:null,rules:{login:'either',space:'full',apps:[...ALL],limit:0,down:{on:false,from:22,to:6},purchases:true,filter:'off',contacts:CONTACTS.map(c=>c.id),msgPhotos:true,keywords:[],video:'all'}},
+    {id:'sam',name:'Sam',level:2,pin:'2222',wh:175,wall:{preset:2},used:65,grants:{},earned:null,rules:{login:'either',space:'full',apps:ALL.filter(a=>a!=='bank'),limit:0,down:{on:false,from:22,to:6},purchases:true,filter:'off',contacts:CONTACTS.map(c=>c.id),msgPhotos:true,keywords:[],video:'all'}},
+    {id:'jordan',name:'Jordan',level:3,pin:'3333',wh:235,wall:{preset:3},used:84,grants:{},earned:null,rules:{login:'either',space:'full',apps:['phone','messages','camera','photos','browser','maps','music','video','books','calc','calendar','clock','notes','podcasts','school','weather'],limit:120,down:{on:true,from:21,to:7},purchases:false,filter:'standard',contacts:['alex','sam','mia','grandma','coach','ava'],msgPhotos:true,keywords:['vape','casino','gambling'],video:'teen'}},
+    {id:'mia',name:'Mia',level:4,pin:'4444',wh:320,wall:{preset:1},used:20,grants:{},earned:null,rules:{login:'bio',space:'kids',apps:['phone','messages','camera','music','video','games','books','drawing','school','calc','clock','weather','photos','notes','calendar'],limit:60,down:{on:true,from:20,to:7},purchases:false,filter:'strict',contacts:['alex','sam','jordan','grandma'],msgPhotos:false,keywords:['scary','horror','vape','casino'],video:'kids'}},
+    {id:'guest',name:'Guest',level:4,pin:null,wh:210,used:0,grants:{},earned:null,rules:{login:'none',space:'allowed',apps:['phone','camera','maps','music','weather','clock','calc'],limit:30,down:{on:true,from:21,to:7},purchases:false,filter:'strict',contacts:['alex','sam'],msgPhotos:false,keywords:[],video:'kids'}}
+  ],
+  tasks:[
+    {id:1,who:'mia',title:'Clean your room',note:'Bed made, toys in the bin, clothes in the hamper.',photo:true,locks:true,reward:{kind:'bed'},status:'open',photos:[],by:'Alex',at:'3:30 pm'},
+    {id:2,who:'jordan',title:'Take out the trash',note:'Kitchen and bathroom bins.',photo:false,locks:false,reward:{kind:'hours',hours:1},status:'open',photos:[],by:'Sam',at:'2:10 pm'}
+  ],
+  comms:[
+    {day:0,at:'3:41 pm',kind:'text',from:'jordan',to:'ava',text:'are you going to practice?'},
+    {day:0,at:'3:42 pm',kind:'text',from:'ava',to:'jordan',text:'yes! see you there'},
+    {day:0,at:'3:44 pm',kind:'photo',from:'jordan',to:'ava',text:'field is open',img:SEED_IMG},
+    {day:0,at:'3:15 pm',kind:'call',from:'mia',to:'grandma',text:'4 min call'},
+    {day:0,at:'2:58 pm',kind:'blocked',from:'tyler',to:'jordan',text:'Text from Tyler was blocked (not an approved contact)'},
+    {day:1,at:'7:52 am',kind:'text',from:'jordan',to:'coach',text:'Running 5 min late, sorry'},
+    {day:13,at:'6:20 pm',kind:'text',from:'jordan',to:'alex',text:"Can I stay at Ava's tonight?"}
+  ],
+  requests:[{id:1,who:'jordan',app:'games',amount:'30 min',status:'pending',at:'3:52 pm'}],
+  log:[
+    {at:'3:52 pm',lvl:3,actor:'jordan',text:'Jordan asked for 30 min of Games'},
+    {at:'8:15 am',lvl:3,actor:'sam',text:'Sam turned off Games for Jordan'},
+    {at:'7:00 am',lvl:3,actor:'system',text:'Downtime ended for Jordan and Guest'}
+  ]
+}}
+let S=initial();
+
+const fmt=h=>{const H=Math.floor(h),m=Math.round((h-H)*60);return `${(H+11)%12+1}:${String(m).padStart(2,'0')} ${H<12?'am':'pm'}`};
+const hr=h=>`${(h+11)%12+1} ${h<12?'am':'pm'}`;
+const person=id=>S.people.find(p=>p.id===id);
+const me=()=>person(S.user);
+const inWin=(h,f,t)=>f>t?(h>=f||h<t):(h>=f&&h<t);
+const lv=n=>`L${n}`;
+const approversOf=p=>S.people.filter(q=>q.level<p.level).sort((a,b)=>b.level-a.level).map(q=>q.name);
+const listJoin=a=>a.length<2?a.join(''):a.slice(0,-1).join(', ')+' and '+a[a.length-1];
+function log(text,lvl,actor,key){
+  const e={at:fmt(S.hour),lvl,actor,text,key};
+  if(key&&S.log[0]&&S.log[0].key===key)S.log[0]=e;else S.log.unshift(e);
+}
+function downtimeOn(p){return p.rules.down.on&&inWin(S.hour,p.rules.down.from,p.rules.down.to)}
+const openTasks=p=>S.tasks.filter(t=>t.who===p.id&&['open','review','redo'].includes(t.status));
+const lockingTask=p=>p.level>1?openTasks(p).find(t=>t.locks):null;
+const earnedOn=p=>p.earned&&S.hour>=p.earned.from&&S.hour<p.earned.until;
+const bedHour=p=>p.rules.down.on?p.rules.down.from:21;
+const canContact=(u,c)=>u.level===1||u.rules.contacts.includes(c);
+const managedBy=(u,id)=>{const p=person(id);return p&&p.level>u.level};
+function rewardText(t,p){const k=t.reward.kind;
+  return k==='lunch'?'time until lunch (12 pm)':k==='dinner'?'time until dinner (6 pm)':k==='bed'?`time until bedtime (${hr(bedHour(p))})`:`${t.reward.hours} ${t.reward.hours===1?'hour':'hours'} of phone time`}
+function lockReason(p,id){
+  if(ALWAYS.includes(id)||p.level===1)return null;
+  if(p.grants[id])return null;
+  const a=app(id),r=p.rules,lt=lockingTask(p);
+  if(!r.apps.includes(id))return `${a.name} isn't on ${p.name}'s allowed list.`;
+  if(lt)return `Finish your task first: ${lt.title}.`;
+  if(downtimeOn(p))return `It's downtime until ${hr(r.down.to)}. Only Phone and Messages work.`;
+  if(r.limit&&p.used>=r.limit&&!earnedOn(p))return `${p.name} has used all ${r.limit} minutes of today's screen time.`;
+  return null;
+}
+
+/* ---------- views ---------- */
+function statusBar(){
+  const u=me();
+  return `<div class="status"><span>${fmt(S.hour)}</span>${u?`<span class="who ${lv(u.level)}"><span class="dot"></span>${u.name}</span>`:'<span></span>'}</div>`;
+}
+function vLock(){
+  const devName=S.device==='phone'?'phone':'tablet';
+  if(S.pinFor&&S.auth==='bio'){
+    const p=person(S.pinFor);
+    return `<div class="content"><div class="lock">
+      <div class="av ${lv(p.level)}" style="width:56px;height:56px;font-size:20px">${p.name[0]}</div>
+      <h2>${S.scanning?'Checking…':`Unlock as ${p.name}`}</h2>
+      <button class="scan ${S.scanning?'busy':''}" data-a="scan" aria-label="Scan face or fingerprint">${I.finger}</button>
+      <div class="hint">Tap the sensor to simulate a face or fingerprint match</div>
+      <div>${p.rules.login==='either'?'<button class="linkbtn" data-a="use-pin">Use PIN instead</button>':''}<button class="linkbtn" data-a="pin-cancel">Cancel</button></div>
+    </div></div>`;
+  }
+  if(S.pinFor){
+    const p=person(S.pinFor),dots=[0,1,2,3].map(i=>`<i class="${i<S.pin.length?'on':''}"></i>`).join('');
+    const keys=[1,2,3,4,5,6,7,8,9].map(n=>`<button data-a="key" data-v="${n}" aria-label="${n}">${n}</button>`).join('');
+    return `<div class="content"><div class="lock">
+      <div class="av ${lv(p.level)}" style="width:56px;height:56px;font-size:20px">${p.name[0]}</div>
+      <h2>Enter ${p.name}'s PIN</h2>
+      <div class="pin-dots ${S.pinErr?'err':''}">${dots}</div>
+      <div class="err-t">${S.pinErr?'Wrong PIN. Try again.':''}</div>
+      <div class="pad">${keys}<button class="txt" data-a="pin-cancel">Cancel</button><button data-a="key" data-v="0">0</button><button class="txt" data-a="key-del">Delete</button></div>
+      <div class="hint">Prototype PIN: ${p.pin}</div>
+      ${p.rules.login==='either'?'<button class="linkbtn" data-a="use-bio">Use face or fingerprint</button>':''}
+    </div></div>`;
+  }
+  const list=S.exitKids?S.people.filter(p=>p.level<=2):S.people;
+  const head=S.exitKids?`<h2>Grown-up unlock to leave ${person(S.exitKids).name}'s space</h2>`:`<h2>Who's using this ${devName}?</h2>`;
+  const back=S.exitKids?'<button class="linkbtn" data-a="kids-back">Back to kids space</button>':'';
+  const btns=list.map(p=>`<button class="who-btn" data-a="pick" data-v="${p.id}"><span class="av ${lv(p.level)}">${p.name[0]}</span><b>${p.name}</b><span class="chip ${lv(p.level)}">${p.level} · ${LEVEL[p.level]}</span></button>`).join('');
+  return `<div class="content"><div class="lock">
+    <div class="big">${fmt(S.hour).replace(/ (am|pm)/,'')}</div>
+    ${head}
+    <div class="who-grid">${btns}</div>${back}
+  </div></div>`;
+}
+const icStyle=a=>`--h:${a.h};${a.s?`--s:${a.s}`:''}`;
+function tile(a,u){
+  const locked=!!lockReason(u,a.id);
+  return `<button class="app ${locked?'locked':''}" data-a="open" data-v="${a.id}" aria-label="${a.name}${locked?', locked':''}"><span class="ic" style="${icStyle(a)}">${a.ab}</span>${locked?`<span class="lk">${I.lock}</span>`:''}<span class="nm">${a.name}</span></button>`;
+}
+function visibleApps(u){const hide=u.level>1&&u.rules.space!=='full';return APPS.filter(a=>!hide||!lockReason(u,a.id))}
+function pageSize(kids){return S.device==='tablet'?(kids?12:24):(kids?9:16)}
+function pagesHTML(items,kids){
+  const per=pageSize(kids),pages=[];
+  for(let i=0;i<items.length;i+=per)pages.push(items.slice(i,i+per));
+  if(!pages.length)pages.push([]);
+  S.page=Math.min(S.page,pages.length-1);
+  const dots=pages.length>1?`<div class="dots" role="group" aria-label="Home screen pages">${pages.map((_,i)=>`<button data-a="page" data-v="${i}" class="${i===S.page?'on':''}" aria-label="Page ${i+1}"></button>`).join('')}</div>`:'';
+  return `<div class="pages" id="pages">${pages.map(p=>`<div class="page">${p.join('')}</div>`).join('')}</div>${dots}`;
+}
+function vHome(){
+  const u=me(),r=u.rules,kids=u.level>1&&r.space==='kids';
+  const vis=visibleApps(u);
+  const items=vis.filter(a=>!DOCK.includes(a.id)).map(a=>({n:a.name,h:tile(a,u)}));
+  if(u.level<=2)items.push({n:'Controls',h:`<button class="app" data-a="controls"><span class="ic ctrl">${I.shield.replace('<svg','<svg width="26" height="26"')}</span><span class="nm">Controls</span></button>`});
+  items.sort((a,b)=>a.n.localeCompare(b.n));
+  const hidden=u.level>1&&r.space!=='full'?APPS.filter(a=>lockReason(u,a.id)).length:0;
+  if(hidden&&!kids)items.push({h:`<button class="app" data-a="more"><span class="ic" style="--h:220;--s:6%">+${hidden}</span><span class="nm">Ask for more</span></button>`});
+  const lt=lockingTask(u);
+  if(lt){
+    const dock=vis.filter(a=>ALWAYS.includes(a.id));
+    return `<div class="content home ${kids?'kids':''}">
+      <div class="topline"><span class="hi">${kids?`${u.name}'s space`:`Hi, ${u.name}`}</span>${kids?'':`<div class="tools"><button class="tbtn" data-a="switch" aria-label="Switch user">${I.user}</button></div>`}</div>
+      <div class="velo"><span class="vav">V</span><div class="vb"><b>Velo</b><span>Hi ${u.name}! Your ${S.device} is locked until your task is done and checked. You'll earn ${rewardText(lt,u)}.</span></div></div>
+      <div style="display:flex;flex-direction:column;gap:10px;overflow:auto;min-height:0;flex:1">${openTasks(u).map(t=>taskCard(t,u)).join('')}</div>
+      <div class="note" style="text-align:center">Phone and Messages still work.</div>
+      <div class="dock">${dock.map(a=>tile(a,u)).join('')}</div>
+      ${kids?'<div class="kfoot"><button data-a="kids-exit">Grown-up exit</button></div>':''}
+    </div>`;
+  }
+  const vk=veloKid(u);
+  let status='';
+  if(u.level>1&&earnedOn(u)&&!downtimeOn(u))status=`<div class="banner"><b>Earned time until ${fmt(u.earned.until)}</b>Nice work on your task. Daily limit is paused until then.</div>`;
+  else if(u.level>1&&downtimeOn(u))status=`<div class="banner"><b>${kids?'Bedtime':`Downtime until ${hr(r.down.to)}`}</b>${kids?`See you at ${hr(r.down.to)}.`:`Only Phone works. Ask ${listJoin(approversOf(u))} for an exception.`}</div>`;
+  else if(r.limit&&u.level>1){
+    const left=Math.max(0,r.limit-u.used),pct=Math.min(100,u.used/r.limit*100);
+    status=`<div class="meter"><div class="row"><span>${kids?(left?`${left} min of play left today`:'Play time is done for today'):'Screen time today'}</span>${kids?'':`<span>${u.used} of ${r.limit} min</span>`}</div><div class="bar ${left?'':'over'}"><i style="width:${pct}%"></i></div></div>`;
+  }
+  const dock=vis.filter(a=>DOCK.includes(a.id));
+  return `<div class="content home ${kids?'kids':''}">
+    <div class="topline"><span class="hi">${kids?`${u.name}'s space`:`Hi, ${u.name}`}</span>
+      <div class="tools">${kids?'':`<span class="chip ${lv(u.level)}">${u.level} · ${LEVEL[u.level]}</span>`}<button class="tbtn" data-a="wall-open" aria-label="Change wallpaper">${I.image}</button>${kids?'':`<button class="tbtn" data-a="switch" aria-label="Switch user">${I.user}</button>`}</div></div>
+    ${vk}${status}
+    ${pagesHTML(items.map(i=>i.h),kids)}
+    ${dock.length?`<div class="dock">${dock.map(a=>tile(a,u)).join('')}</div>`:''}
+    ${kids?'<div class="kfoot"><button data-a="kids-exit">Grown-up exit</button></div>':''}
+  </div>`;
+}
+function veloKid(u){
+  if(u.level===1)return '';
+  const ts=openTasks(u),r=u.rules;let line='',btn='';
+  if(ts.length){const t=ts[0];line=t.status==='review'?`"${t.title}" is waiting for a parent to check.`:`You have ${ts.length===1?'a task':ts.length+' tasks'}: ${t.title}. Finish it to earn ${rewardText(t,u)}.`;btn='<button class="btn" data-a="see-tasks">See task</button>'}
+  else if(r.down.on&&!downtimeOn(u)&&bedHour(u)-S.hour>0&&bedHour(u)-S.hour<=1)line=`${u.level===4?'Bedtime':'Downtime'} starts at ${hr(bedHour(u))}. Time to wrap up.`;
+  else if(r.limit&&!earnedOn(u)&&r.limit-u.used>0&&r.limit-u.used<=40)line=`${r.limit-u.used} min of screen time left today.`;
+  if(!line)return '';
+  return `<div class="velo"><span class="vav">V</span><div class="vb"><b>Velo</b><div class="vline"><span>${line}</span>${btn}</div></div></div>`;
+}
+function taskCard(t,u){
+  const p=person(t.who),kid=u.id===t.who;
+  const tags=`<div class="meta">${t.photo?'<span class="tag warn">Photo required</span>':'<span class="tag">Photo optional</span>'}${t.locks?'<span class="tag">Locks device</span>':''}<span class="tag ok">Earns ${rewardText(t,p)}</span>${kid?`<span class="tag">From ${t.by}</span>`:`<span class="tag">For ${p.name}</span>`}</div>`;
+  const thumbs=t.photos.length?`<div class="thumbs">${t.photos.map(s=>`<img src="${s}" alt="Proof photo">`).join('')}</div>`:'';
+  let foot='';
+  if(kid&&(t.status==='open'||t.status==='redo'))foot=`<div class="row-btns"><label class="btn" for="tp-${t.id}">${I.image.replace('<svg','<svg width="14" height="14"')} Add photo</label><input type="file" id="tp-${t.id}" data-task="${t.id}" accept="image/*" capture="environment" hidden>
+    <button class="btn pri" data-a="task-done" data-v="${t.id}" ${t.photo&&!t.photos.length?'disabled':''}>I'm done</button>${t.photo&&!t.photos.length?'<span class="note">Add a photo first</span>':''}</div>`;
+  else if(kid&&t.status==='review')foot=`<div class="note">Sent for checking. ${listJoin(approversOf(p))} can approve it.</div>`;
+  else if(!kid&&t.status==='review')foot=`<input class="field" id="back-${t.id}" placeholder="Note if sending back (optional)"><div class="row-btns"><button class="btn" data-a="task-back" data-v="${t.id}">Send back</button><button class="btn pri" data-a="task-ok" data-v="${t.id}">Approve and unlock</button></div>`;
+  else if(!kid)foot=`<div class="row-btns"><span class="note">${t.status==='approved'?`Approved by ${t.okBy}`:t.status==='redo'?'Sent back, waiting for a redo':'Waiting for '+p.name}</span><button class="btn" data-a="task-del" data-v="${t.id}" style="margin-left:auto">Remove</button></div>`;
+  return `<div class="task"><h3>${t.title}</h3>${t.note?`<div class="note">${t.note}</div>`:''}${t.status==='redo'&&t.backNote?`<div class="banner"><b>Sent back by ${t.backBy}</b>${t.backNote}</div>`:''}${tags}${thumbs}${foot}</div>`;
+}
+function vPhone(u){
+  const cs=CONTACTS.filter(c=>c.id!==u.id&&canContact(u,c.id));
+  return `<div class="content">
+    <div class="apphead"><button class="back" data-a="home">‹ Home</button></div>
+    <div class="hello"><h2>Phone</h2></div>
+    <div class="list">${cs.map(c=>`<div class="item"><span class="av L4" style="width:34px;height:34px">${c.name[0]}</span><div class="grow"><b>${c.name}</b><div class="sub">${c.tag}</div></div><button class="btn pri" data-a="call" data-v="${c.id}">Call</button></div>`).join('')}
+      <div class="item"><span class="av L4" style="width:34px;height:34px;color:var(--bad)">!</span><div class="grow"><b>Emergency 911</b><div class="sub">Always available</div></div><button class="btn" data-a="call" data-v="911">Call</button></div></div>
+    ${u.level>1?`<div class="note">Only contacts approved by ${listJoin(approversOf(u))} can call or be called. Other numbers are blocked.</div>`:''}
+  </div>`;
+}
+function vMessages(u){
+  if(S.thread){
+    const c=S.thread,msgs=S.comms.filter(m=>m.kind!=='call'&&m.kind!=='blocked'&&((m.from===u.id&&m.to===c)||(m.from===c&&m.to===u.id))).slice().reverse();
+    const ph=u.level===1||u.rules.msgPhotos;
+    return `<div class="content">
+      <div class="apphead"><button class="back" data-a="thread-close">‹ Messages</button><b style="margin-left:auto;margin-right:auto">${cname(c)}</b></div>
+      <div class="thread">${msgs.map(m=>`<div class="bub ${m.from===u.id?'me':''}">${m.img?`<img src="${m.img}" alt="Picture">`:''}${m.text||''}<span class="tm">${m.day?m.day+'d ago':m.at}</span></div>`).join('')||'<div class="empty">No messages yet</div>'}</div>
+      <div class="inrow">${ph?`<label class="btn" for="msg-photo" aria-label="Send a picture">${I.image.replace('<svg','<svg width="16" height="16"')}</label><input type="file" id="msg-photo" accept="image/*" hidden>`:`<button class="btn" disabled title="Pictures turned off by a parent" aria-label="Pictures turned off">${I.image.replace('<svg','<svg width="16" height="16"')}</button>`}
+        <input class="field" id="msg-text" placeholder="Message" data-enter="msg-send"><button class="btn pri" data-a="msg-send">Send</button></div>
+      ${!ph?'<div class="note">Sending pictures is turned off by a parent.</div>':''}
+    </div>`;
+  }
+  const cs=CONTACTS.filter(c=>c.id!==u.id&&canContact(u,c.id));
+  return `<div class="content">
+    <div class="apphead"><button class="back" data-a="home">‹ Home</button></div>
+    <div class="hello"><h2>Messages</h2></div>
+    <div class="list">${cs.map(c=>{const last=S.comms.find(m=>m.kind!=='call'&&m.kind!=='blocked'&&((m.from===u.id&&m.to===c.id)||(m.from===c.id&&m.to===u.id)));
+      return `<button class="item" data-a="thread" data-v="${c.id}"><span class="av L4" style="width:34px;height:34px">${c.name[0]}</span><div class="grow"><b>${c.name}</b><div class="sub">${last?(last.img&&!last.text?'Picture':last.text):c.tag}</div></div><span class="end">${I.chev}</span></button>`}).join('')}</div>
+    ${u.level>1?'<div class="note">You can only text approved contacts. Parents can see messages for 14 days.</div>':''}
+  </div>`;
+}
+function vBrowser(u){
+  const w=S.web;let res='';
+  if(w&&w.blocked)res=`<div class="banner"><b>Search blocked</b>"${w.q}" includes a blocked word. ${listJoin(approversOf(u))} can see blocked searches.</div>`;
+  else if(w)res=`<div class="list"><div class="result"><b>${w.q} · Wikipedia</b>Overview article</div><div class="result"><b>${w.q} explained for students</b>Learning site</div><div class="result"><b>Best ${w.q} videos</b>Filtered results only</div></div>`;
+  return `<div class="content">
+    <div class="apphead"><button class="back" data-a="home">‹ Home</button></div>
+    <div class="hello"><h2>Browser</h2>${u.level>1?`<span class="tag">Filter: ${u.rules.filter}</span>`:''}</div>
+    <div class="inrow"><input class="field" id="web-q" placeholder="Search the web" data-enter="web-go"><button class="btn pri" data-a="web-go">Go</button></div>
+    ${res}
+    ${u.level>1&&u.rules.keywords.length?`<div class="note">Blocked words for ${u.name}: ${u.rules.keywords.length}. Try searching "${u.rules.keywords[0]}".</div>`:''}
+  </div>`;
+}
+function vVideo(u){
+  const lvl=u.level===1?'all':u.rules.video,kw=u.level===1?[]:u.rules.keywords;
+  const ok=VIDEOS.filter(v=>VRANK[v.r]<=VRANK[lvl]&&!kw.some(k=>v.t.toLowerCase().includes(k)));
+  return `<div class="content">
+    <div class="apphead"><button class="back" data-a="home">‹ Home</button></div>
+    <div class="hello"><h2>Video</h2><span class="tag">${VNAME[lvl]} content</span></div>
+    <div class="list">${ok.map(v=>`<div class="item"><span class="mini" style="--h:4">▶</span><div class="grow">${v.t}<div class="sub">${VNAME[v.r]}</div></div></div>`).join('')}</div>
+    ${u.level>1?`<div class="note">${VIDEOS.length-ok.length} videos hidden by ${u.name}'s video setting and blocked words.</div>`:''}
+  </div>`;
+}
+function vApp(){
+  const a=app(S.openApp),u=me();
+  if(a.id==='phone')return vPhone(u);
+  if(a.id==='messages')return vMessages(u);
+  if(a.id==='browser')return vBrowser(u);
+  if(a.id==='video')return vVideo(u);
+  let extra='';
+  if(a.id==='browser')extra=`Web filter: <b>${u.rules.filter==='off'?'off':u.rules.filter}</b>`;
+  else if(a.id==='store')extra=u.rules.purchases?'Installs and purchases allowed':`Installs and purchases need approval from ${listJoin(approversOf(u))}`;
+  else if(a.id==='games'||a.id==='video')extra=u.rules.purchases?'In-app purchases allowed':'In-app purchases blocked';
+  const counted=u.rules.limit&&u.level>1?`<div class="note">Counting toward screen time: ${u.used} of ${u.rules.limit} min used</div>`:'';
+  return `<div class="content">
+    <div class="apphead"><button class="back" data-a="home">‹ Home</button></div>
+    <div class="appbody"><span class="ic" style="--h:${a.h};${a.s?`--s:${a.s}`:''}">${a.ab}</span><h3>${a.name}</h3><div>${extra||'App is open'}</div>${counted}</div>
+  </div>`;
+}
+function vControls(){
+  const u=me();
+  const pend=S.requests.filter(q=>q.status==='pending'&&person(q.who).level>u.level).length;
+  const rev=S.tasks.filter(t=>t.status==='review'&&managedBy(u,t.who)).length;
+  const badge={requests:pend,tasks:rev};
+  const tabs=[['people','People',I.people],['tasks','Tasks',I.check],['requests','Requests',I.inbox],['chats','Chats',I.chat],['activity','Log',I.clock]].map(([k,l,ic])=>
+    `<button data-a="tab" data-v="${k}" aria-current="${S.tab===k}">${ic}<span>${l}</span>${badge[k]?`<span class="badge">${badge[k]}</span>`:''}</button>`).join('')
+    +`<button data-a="home">${I.home}<span>Home</span></button>`;
+  let body='';
+  if(S.tab==='people')body=S.editing?vRules(person(S.editing)):veloParent(u)+vPeople();
+  else if(S.tab==='tasks')body=vTasksAdmin(u);
+  else if(S.tab==='requests')body=vRequests();
+  else if(S.tab==='chats')body=vChats(u);
+  else body=vActivity();
+  return `<div class="controls"><div class="ctl-main">${body}</div><nav class="tabs">${tabs}</nav></div>`;
+}
+function veloParent(u){
+  const kids=S.people.filter(p=>p.level>u.level),L=[];
+  S.tasks.filter(t=>t.status==='review'&&managedBy(u,t.who)).forEach(t=>L.push([`${person(t.who).name} finished "${t.title}"${t.photos.length?` and sent ${t.photos.length} photo${t.photos.length>1?'s':''}`:''}.`,'<button class="btn pri" data-a="tab" data-v="tasks">Review</button>']));
+  const pr=S.requests.filter(q=>q.status==='pending'&&managedBy(u,q.who));
+  if(pr.length)L.push([`${listJoin([...new Set(pr.map(q=>person(q.who).name))])} ${pr.length>1?'have':'has'} ${pr.length} app request${pr.length>1?'s':''}.`,'<button class="btn" data-a="tab" data-v="requests">Open</button>']);
+  kids.forEach(p=>{const r=p.rules;
+    if(lockingTask(p)&&!S.tasks.some(t=>t.who===p.id&&t.status==='review'))L.push([`${p.name}'s ${p.level===4?'tablet':'phone'} is locked until "${lockingTask(p).title}" is done.`,`<button class="btn" data-a="remind" data-v="${p.id}">Remind</button>`]);
+    else if(r.limit&&!earnedOn(p)&&r.limit-p.used>0&&r.limit-p.used<=40)L.push([`${p.name} has ${r.limit-p.used} min of screen time left.`,`<button class="btn" data-a="remind" data-v="${p.id}">Remind</button>`]);
+    if(r.down.on&&!downtimeOn(p)&&bedHour(p)-S.hour>0&&bedHour(p)-S.hour<=1)L.push([`${p.name}'s ${p.level===4?'bedtime':'downtime'} starts at ${hr(bedHour(p))}.`,'']);
+  });
+  const bl=S.comms.filter(m=>m.kind==='blocked'&&m.day===0&&managedBy(u,m.to));
+  if(bl.length)L.push([`I blocked ${bl.length} message${bl.length>1?'s':''} from unapproved contacts today.`,'<button class="btn" data-a="tab" data-v="chats">See</button>']);
+  return `<div class="velo"><span class="vav">V</span><div class="vb"><b>Velo assistant</b>${(L.length?L:[['All quiet. Nothing needs you right now.','']]).map(([t,b])=>`<div class="vline"><span>${t}</span>${b}</div>`).join('')}</div></div>`;
+}
+function vTasksAdmin(u){
+  const kids=S.people.filter(p=>p.level>u.level&&p.level>2),n=S.nt;
+  if(!kids.some(k=>k.id===n.who))n.who=kids[0]&&kids[0].id;
+  const mine=S.tasks.filter(t=>managedBy(u,t.who));
+  const rev=mine.filter(t=>t.status==='review'),open=mine.filter(t=>['open','redo'].includes(t.status)),done=mine.filter(t=>t.status==='approved');
+  const kid=person(n.who);
+  const form=kid?`<div class="group"><h4>New task</h4><div class="list"><div class="formgrid">
+    <label class="lab">For</label><div class="seg" role="group" aria-label="Task for">${kids.map(k=>`<button data-a="nt-who" data-v="${k.id}" aria-pressed="${n.who===k.id}">${k.name}</button>`).join('')}</div>
+    <label class="lab" for="nt-title">Task</label><input class="field" id="nt-title" value="${esc(n.title)}" data-nt="title">
+    <div class="chiprow">${TASK_PRESETS.map(t=>`<button data-a="nt-preset" data-v="${t}">${t}</button>`).join('')}</div>
+    <label class="lab" for="nt-note">Details (optional)</label><input class="field" id="nt-note" value="${esc(n.note)}" placeholder="What does done look like?" data-nt="note">
+    <div class="inrow"><span style="flex:1">Photo proof required</span>${sw('nt-photo',n.photo,'Photo proof required')}</div>
+    <div class="inrow"><span style="flex:1">Lock ${kid.name}'s device until done</span>${sw('nt-locks',n.locks,'Lock device until done')}</div>
+    <label class="lab">When approved, unlock</label><div class="seg" role="group" aria-label="Reward">${Object.keys(REWARD).map(k=>`<button data-a="nt-reward" data-v="${k}" aria-pressed="${n.reward===k}">${k==='bed'?`Until bedtime (${hr(bedHour(kid))})`:REWARD[k]}</button>`).join('')}</div>
+    ${n.reward==='hours'?`<div class="stepper"><button data-a="nt-hours" data-v="-0.5" aria-label="Less time">−</button><output>${n.hours} hr</output><button data-a="nt-hours" data-v="0.5" aria-label="More time">+</button></div>`:''}
+    <button class="btn pri" data-a="nt-send">Send task to ${kid.name}</button>
+  </div></div></div>`:'<div class="empty">No one below your level to give tasks to.</div>';
+  return `<div class="ctl-title"><h2>Tasks</h2></div>
+    ${rev.length?`<div class="group"><h4>Ready to check</h4><div style="display:flex;flex-direction:column;gap:10px">${rev.map(t=>taskCard(t,u)).join('')}</div></div>`:''}
+    <div class="rules-cols">${form}
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="group"><h4>Waiting on kids</h4><div style="display:flex;flex-direction:column;gap:10px">${open.map(t=>taskCard(t,u)).join('')||'<div class="list"><div class="empty">No open tasks</div></div>'}</div></div>
+      ${done.length?`<div class="group"><h4>Approved</h4><div style="display:flex;flex-direction:column;gap:10px">${done.map(t=>taskCard(t,u)).join('')}</div></div>`:''}
+    </div></div>`;
+}
+function vChats(u){
+  const kids=S.people.filter(p=>p.level>u.level);
+  const f=S.commFor;
+  const rel=m=>managedBy(u,m.from)||managedBy(u,m.to);
+  const rows=S.comms.filter(m=>rel(m)&&m.day<14&&(f==='all'||m.from===f||m.to===f));
+  const days=[...new Set(rows.map(m=>m.day))].sort((a,b)=>a-b);
+  const dl=d=>d===0?'Today':d===1?'Yesterday':`${d} days ago · deleted in ${14-d} day${14-d>1?'s':''}`;
+  const K={text:'Text',photo:'Photo',call:'Call',blocked:'Blocked'};
+  return `<div class="ctl-title"><h2>Calls and texts</h2></div>
+    <div class="seg" role="group" aria-label="Filter by person"><button data-a="comm-for" data-v="all" aria-pressed="${f==='all'}">Everyone</button>${kids.map(k=>`<button data-a="comm-for" data-v="${k.id}" aria-pressed="${f===k.id}">${k.name}</button>`).join('')}</div>
+    <div class="note">Calls, texts and pictures are kept for 14 days, then deleted automatically.</div>
+    ${days.map(d=>`<div class="day">${dl(d)}</div><div class="list">${rows.filter(m=>m.day===d).map(m=>`<div class="item comm"><span class="kind ${m.kind==='blocked'?'bad':''}">${K[m.kind]}</span><div class="grow"><b>${cname(m.from)} → ${cname(m.to)}</b><div class="sub">${m.text||''}</div>${m.img?`<img src="${m.img}" alt="Picture sent">`:''}</div><span class="t" style="text-align:right">${m.at}</span></div>`).join('')}</div>`).join('')||'<div class="list"><div class="empty">No calls or texts yet</div></div>'}`;
+}
+function summary(p){
+  if(p.level===1)return 'No restrictions';
+  const r=p.rules,n=r.apps.length;
+  return `${SPACE[r.space]} · ${n} of ${APPS.length} apps ·${r.limit?`${p.used}/${r.limit} min`:'no time limit'}${r.down.on?` · downtime ${hr(r.down.from)}`:''}`;
+}
+function vPeople(){
+  const u=me();
+  const groups=[1,2,3,4].map(L=>{
+    const ps=S.people.filter(p=>p.level===L);if(!ps.length)return '';
+    return `<div class="group"><h4>Level ${L} · ${LEVEL[L]}</h4><div class="list">${ps.map(p=>{
+      const can=u.level<p.level;
+      const endTxt=p.id===u.id?'You':can?I.chev:`${I.lock} Higher level`;
+      return `<${can?'button':'div'} class="item" ${can?`data-a="edit" data-v="${p.id}"`:''}><span class="av ${lv(p.level)}">${p.name[0]}</span><div class="grow"><b>${p.name}</b><div class="sub">${summary(p)}</div></div><span class="end">${endTxt}</span></${can?'button':'div'}>`;
+    }).join('')}</div></div>`;
+  }).join('');
+  return `<div class="ctl-title"><h2>People</h2></div>
+    <div class="note">You can change rules for anyone below level ${u.level}.</div>${groups}`;
+}
+function sw(action,on,label,v=''){return `<button class="sw" role="switch" aria-checked="${on}" aria-label="${label}" data-a="${action}" data-v="${v}"></button>`}
+function vRules(p){
+  const u=me(),r=p.rules;
+  const levels=[2,3,4].filter(L=>L>u.level).map(L=>`<button data-a="level" data-v="${L}" aria-pressed="${p.level===L}">${L} · ${LEVEL[L]}</button>`).join('');
+  const contacts=CONTACTS.filter(c=>c.id!==p.id).map(c=>`<div class="item"><span class="av L4" style="width:30px;height:30px;font-size:13px">${c.name[0]}</span><div class="grow">${c.name}<div class="sub">${c.tag}</div></div>${sw('toggle-contact',r.contacts.includes(c.id),c.name,c.id)}</div>`).join('');
+  const kws=r.keywords.map(k=>`<span class="kw">${k}<button data-a="kw-del" data-v="${k}" aria-label="Unblock ${k}">×</button></span>`).join('');
+  const apps=APPS.filter(a=>!ALWAYS.includes(a.id)).map(a=>`<div class="item"><span class="mini" style="--h:${a.h};${a.s?`--s:${a.s}`:''}">${a.ab}</span><div class="grow">${a.name}${p.grants[a.id]?'<div class="sub">Allowed today by request</div>':''}</div>${sw('toggle-app',r.apps.includes(a.id),a.name,a.id)}</div>`).join('');
+  const hours=sel=>Array.from({length:24},(_,h)=>`<option value="${h}" ${h===sel?'selected':''}>${hr(h)}</option>`).join('');
+  const filters=['off','standard','strict'].map(f=>`<button data-a="filter" data-v="${f}" aria-pressed="${r.filter===f}">${f[0].toUpperCase()+f.slice(1)}</button>`).join('');
+  return `<div class="apphead"><button class="back" data-a="back-people">‹ People</button></div>
+    <div class="hello"><div style="display:flex;gap:10px;align-items:center"><span class="av ${lv(p.level)}">${p.name[0]}</span><h2>${p.name}</h2></div><span class="chip ${lv(p.level)}">Level ${p.level} · ${LEVEL[p.level]}</span></div>
+    <div class="group"><h4>Access level</h4><div class="seg" role="group" aria-label="Access level">${levels}</div>
+      <div class="note" style="margin-top:6px">${u.level===1?'You can make someone a Manager.':'Managers can only assign levels 3 and 4.'}</div></div>
+    <div class="group"><h4>Sign-in and home screen</h4><div class="list">
+      <div class="item wrap"><div class="grow">Unlock with</div><div class="seg" role="group" aria-label="Unlock with">${Object.keys(LOGIN).filter(k=>k!=='none'||p.level===4).map(k=>`<button data-a="login-m" data-v="${k}" aria-pressed="${r.login===k}">${LOGIN[k]}</button>`).join('')}</div></div>
+      <div class="item wrap"><div class="grow">Home screen<div class="sub">${r.space==='full'?'Blocked apps show with a lock':r.space==='allowed'?'Blocked apps are hidden':'Opens straight into a simple space with big icons'}</div></div><div class="seg" role="group" aria-label="Home screen">${Object.keys(SPACE).map(k=>`<button data-a="space" data-v="${k}" aria-pressed="${r.space===k}">${SPACE[k]}</button>`).join('')}</div></div>
+    </div></div>
+    <div class="rules-cols">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="group"><h4>Calls and texts</h4><div class="list">${contacts}
+          <div class="item"><div class="grow">Send and receive pictures</div>${sw('msg-photos',r.msgPhotos,'Pictures in messages')}</div></div>
+          <div class="note" style="margin-top:6px">Phone and Messages always work, but only with these contacts. 911 always works. You can see calls and texts for 14 days.</div></div>
+        <div class="group"><h4>Allowed apps</h4><div class="list">${apps}</div></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="group"><h4>Screen time</h4><div class="list">
+          <div class="item"><div class="grow">Daily limit<div class="sub">Used today: ${p.used} min</div></div><div class="stepper"><button data-a="limit" data-v="-1" aria-label="Less time">−</button><output>${r.limit?r.limit+' min':'Off'}</output><button data-a="limit" data-v="1" aria-label="More time">+</button></div></div>
+          <div class="item"><div class="grow">Downtime<div class="sub">Only Phone works</div></div>${sw('down',r.down.on,'Downtime')}</div>
+          ${r.down.on?`<div class="item"><div class="grow">From</div><select id="down-from" data-c="from" aria-label="Downtime starts">${hours(r.down.from)}</select></div>
+          <div class="item"><div class="grow">Until</div><select id="down-to" data-c="to" aria-label="Downtime ends">${hours(r.down.to)}</select></div>`:''}
+        </div></div>
+        <div class="group"><h4>Content</h4><div class="list">
+          <div class="item"><div class="grow">Installs and in-app purchases</div>${sw('purchases',r.purchases,'Purchases')}</div>
+          <div class="item"><div class="grow">Web filter</div><div class="seg" role="group" aria-label="Web filter">${filters}</div></div>
+          <div class="item wrap"><div class="grow">YouTube and video<div class="sub">Which videos ${p.name} can see</div></div><div class="seg" role="group" aria-label="Video content">${Object.keys(VNAME).map(k=>`<button data-a="video-lvl" data-v="${k}" aria-pressed="${r.video===k}">${VNAME[k]}</button>`).join('')}</div></div>
+          <div class="item wrap"><div class="grow">Blocked words<div class="sub">Blocks web searches and videos that include them</div></div>
+            <div class="chiprow">${kws||'<span class="note">None yet</span>'}</div>
+            <div class="inrow"><input class="field" id="kw-new" placeholder="Add a word" data-enter="kw-add"><button class="btn" data-a="kw-add">Add</button></div></div>
+        </div></div>
+      </div>
+    </div>`;
+}
+function vRequests(){
+  const u=me();
+  const mine=S.requests.filter(q=>person(q.who).level>u.level);
+  const pend=mine.filter(q=>q.status==='pending'),done=mine.filter(q=>q.status!=='pending');
+  const row=q=>{const p=person(q.who),a=app(q.app);
+    return `<div class="item"><span class="mini" style="--h:${a.h};${a.s?`--s:${a.s}`:''}">${a.ab}</span><div class="grow"><b>${p.name}</b> wants ${a.name}<div class="sub">${q.amount==='Always'?'Always allowed':q.amount} · asked ${q.at}</div></div>
+    ${q.status==='pending'?`<div class="req-actions"><button class="btn" data-a="deny" data-v="${q.id}">Deny</button><button class="btn pri" data-a="approve" data-v="${q.id}">Approve</button></div>`
+    :`<span class="st ${q.status==='approved'?'ok':'bad'}">${q.status==='approved'?'Approved':'Denied'} by ${q.by}</span>`}</div>`};
+  return `<div class="ctl-title"><h2>Requests</h2></div>
+    <div class="group"><h4>Waiting</h4><div class="list">${pend.length?pend.map(row).join(''):'<div class="empty">No requests waiting</div>'}</div></div>
+    ${done.length?`<div class="group"><h4>Handled</h4><div class="list">${done.map(row).join('')}</div></div>`:''}`;
+}
+function vActivity(){
+  const u=me();
+  const rows=S.log.filter(e=>u.level===1||e.lvl>u.level||e.actor===u.id);
+  return `<div class="ctl-title"><h2>Activity</h2></div>
+    <div class="note">${u.level===1?'You see activity for everyone.':`You see activity for levels ${u.level+1} to 4.`}</div>
+    <div class="list">${rows.map(e=>`<div class="item"><span class="t">${e.at}</span><div class="grow">${e.text}</div></div>`).join('')||'<div class="empty">Nothing yet</div>'}</div>`;
+}
+function vSheet(){
+  if(!S.sheet)return '';
+  if(S.sheet==='wall'){
+    const u=me(),w=u.wall||{};
+    const sw=WALLS.map((g,i)=>`<button class="wsw ${w.preset===i&&!w.img?'on':''}" style="background:${g}" data-a="wall-set" data-v="${i}" aria-label="${WALL_NAMES[i]}"></button>`).join('');
+    return `<div class="scrim" data-a="close-sheet"><div class="sheet" role="dialog" aria-label="Wallpaper">
+      <h3>Wallpaper</h3><p>Pick a background for ${u.name}'s home screen, or use a photo.</p>
+      <div class="walls">${sw}</div>
+      ${w.img?`<div class="sheet-row" style="align-items:center"><span class="wsw photo on" style="width:44px;background-image:url('${w.img}')"></span><span class="note">Your photo is set</span></div>`:''}
+      <div class="sheet-row"><label class="btn pri" for="wall-file">Choose a photo</label><input type="file" id="wall-file" accept="image/*" hidden>
+      ${u.wall?'<button class="btn" data-a="wall-set" data-v="none">No wallpaper</button>':''}<button class="btn" data-a="close-sheet">Done</button></div>
+    </div></div>`;
+  }
+  if(S.sheet==='tasks'){
+    const u=me();
+    return `<div class="scrim" data-a="close-sheet"><div class="sheet" role="dialog" aria-label="Your tasks" style="max-height:85%;overflow:auto">
+      <h3>Your tasks</h3>${openTasks(u).map(t=>taskCard(t,u)).join('')||'<p>All done!</p>'}
+      <button class="btn" data-a="close-sheet">Close</button></div></div>`;
+  }
+  if(S.sheet==='more'){
+    const u=me(),hidden=APPS.filter(a=>lockReason(u,a.id));
+    return `<div class="scrim" data-a="close-sheet"><div class="sheet" role="dialog" aria-label="Ask for more apps">
+      <h3>Ask for more apps</h3><p>These are hidden on your home screen. Pick one to ask ${listJoin(approversOf(u))}.</p>
+      <div class="list">${hidden.map(a=>`<button class="item" data-a="pick-hidden" data-v="${a.id}"><span class="mini" style="--h:${a.h};${a.s?`--s:${a.s}`:''}">${a.ab}</span><div class="grow">${a.name}</div><span class="end">${I.chev}</span></button>`).join('')}</div>
+      <button class="btn" data-a="close-sheet">Close</button></div></div>`;
+  }
+  const u=me(),a=app(S.sheet),why=lockReason(u,a.id);
+  const pending=S.requests.find(q=>q.who===u.id&&q.app===a.id&&q.status==='pending');
+  const who=listJoin(approversOf(u));
+  return `<div class="scrim" data-a="close-sheet"><div class="sheet" role="dialog" aria-label="${a.name} is locked">
+    <h3><span class="mini" style="--h:${a.h};${a.s?`--s:${a.s}`:''}">${a.ab}</span>${a.name} is locked</h3>
+    <p>${why}</p>
+    ${pending?`<p><b>Request sent.</b> Waiting for ${who}.</p>`:`<p>Ask ${who} for access:</p>
+    <div class="opts"><button class="btn" data-a="ask" data-v="30 min">30 min</button><button class="btn" data-a="ask" data-v="1 hour">1 hour</button><button class="btn" data-a="ask" data-v="Always">Always</button></div>`}
+    <button class="btn" data-a="close-sheet">Close</button>
+  </div></div>`;
+}
+
+function render(){
+  const d=document.getElementById('device');
+  d.className=S.device;
+  document.getElementById('dev-phone').setAttribute('aria-pressed',S.device==='phone');
+  document.getElementById('dev-tablet').setAttribute('aria-pressed',S.device==='tablet');
+  document.getElementById('hourv').textContent=fmt(S.hour);
+  document.getElementById('hour').value=S.hour;
+  let v=S.view==='lock'||!S.user?vLock():S.view==='home'||S.view==='kids'?vHome():S.view==='app'?vApp():vControls();
+  const scr=document.getElementById('screen'),u=S.user&&S.view!=='lock'?me():null;
+  const onHome=u&&(S.view==='home'||S.view==='kids');
+  scr.className=onHome&&u.wall?'pic':u?(u.rules.space==='kids'&&u.level>1?'kidswall':'walled'):'';
+  if(u)scr.style.setProperty('--wh',u.wh);
+  scr.style.background=onHome&&u.wall?(u.wall.img?`center/cover no-repeat url('${u.wall.img}')`:WALLS[u.wall.preset]):'';
+  scr.innerHTML=statusBar()+v+vSheet()+(S.toast?`<div class="toast" role="status">${S.toast}</div>`:'');
+  const pg=document.getElementById('pages');
+  if(pg){pg.scrollLeft=S.page*pg.clientWidth;wirePages(pg)}
+}
+function wirePages(pg){
+  let t;
+  pg.addEventListener('scroll',()=>{clearTimeout(t);t=setTimeout(()=>{
+    const i=Math.round(pg.scrollLeft/pg.clientWidth);if(i===S.page)return;S.page=i;
+    document.querySelectorAll('.dots button').forEach((d,k)=>d.classList.toggle('on',k===i));
+  },60)},{passive:true});
+  // Mouse drag to swipe on desktop; touch and trackpads scroll natively.
+  let x0=0,s0=0,down=false,moved=false;
+  pg.addEventListener('pointerdown',e=>{if(e.pointerType!=='mouse'||e.button!==0)return;down=true;moved=false;x0=e.clientX;s0=pg.scrollLeft});
+  pg.addEventListener('pointermove',e=>{if(!down)return;const dx=e.clientX-x0;
+    if(!moved&&Math.abs(dx)>8){moved=true;pg.style.scrollSnapType='none';pg.setPointerCapture(e.pointerId)}
+    if(moved)pg.scrollLeft=s0-dx});
+  const end=e=>{if(!down)return;down=false;if(!moved)return;
+    const w=pg.clientWidth,dx=e.clientX-x0,n=pg.children.length;
+    const i=Math.max(0,Math.min(n-1,Math.round(s0/w)+(dx<-40?1:dx>40?-1:0)));
+    pg.style.scrollSnapType='';pg.scrollTo({left:i*w,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
+    dragged=Date.now()};
+  pg.addEventListener('pointerup',end);pg.addEventListener('pointercancel',end);
+}
+let dragged=0;
+function shrinkPhoto(file,cb){
+  const rd=new FileReader();
+  rd.onload=()=>{const img=new Image();img.onload=()=>{
+    const k=Math.min(1,1100/Math.max(img.width,img.height)),c=document.createElement('canvas');
+    c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+    cb(c.toDataURL('image/jpeg',.85))};img.onerror=()=>cb(null);img.src=rd.result};
+  rd.onerror=()=>cb(null);rd.readAsDataURL(file);
+}
+let toastT;
+function toast(t){S.toast=t;clearTimeout(toastT);toastT=setTimeout(()=>{S.toast=null;render()},2600)}
+
+function signIn(p,how){
+  const leaving=S.exitKids;
+  S.user=p.id;S.pinFor=null;S.pin='';S.scanning=false;S.exitKids=null;S.editing=null;
+  S.view=p.level>1&&p.rules.space==='kids'?'kids':'home';S.page=0;
+  if(leaving)log(`${p.name} unlocked the ${S.device} from ${person(leaving).name}'s kids space`,person(leaving).level,p.id);
+  else if(how)log(`${p.name} signed in with ${how}`,p.level,p.id);
+}
+let scanT;
+const A={
+  device:v=>S.device=v,
+  pick:v=>{const p=person(v);if(p.rules.login==='none'||!p.pin){signIn(p);return}
+    S.pinFor=v;S.pin='';S.pinErr=false;S.scanning=false;S.auth=p.rules.login==='pin'?'pin':'bio'},
+  key:v=>{if(S.pin.length>=4)return;S.pin+=v;S.pinErr=false;
+    if(S.pin.length===4){const p=person(S.pinFor);if(S.pin===p.pin)signIn(p,'PIN');else{S.pinErr=true;S.pin=''}}},
+  'key-del':()=>{S.pin=S.pin.slice(0,-1)},
+  'pin-cancel':()=>{clearTimeout(scanT);S.pinFor=null;S.pin='';S.pinErr=false;S.scanning=false},
+  'use-pin':()=>{clearTimeout(scanT);S.auth='pin';S.scanning=false},
+  'use-bio':()=>{S.auth='bio';S.pin=''},
+  scan:()=>{if(S.scanning)return;S.scanning=true;const id=S.pinFor;
+    scanT=setTimeout(()=>{if(S.pinFor===id){signIn(person(id),'face or fingerprint');render()}},900)},
+  'kids-exit':()=>{S.exitKids=S.user;S.user=null;S.view='lock'},
+  page:v=>S.page=Number(v),
+  'wall-open':()=>S.sheet='wall',
+  'wall-set':v=>{const u=me();u.wall=v==='none'?null:{preset:Number(v)}},
+  'kids-back':()=>{const id=S.exitKids;S.exitKids=null;S.user=id;S.view='kids'},
+  more:()=>S.sheet='more',
+  'pick-hidden':v=>S.sheet=v,
+  'login-m':v=>{const p=person(S.editing);p.rules.login=v;log(`${me().name} set ${p.name} to unlock with ${LOGIN[v].toLowerCase()}`,p.level,S.user,'login-'+p.id)},
+  space:v=>{const p=person(S.editing);p.rules.space=v;log(`${me().name} set ${p.name}'s home screen to ${SPACE[v].toLowerCase()}`,p.level,S.user,'space-'+p.id)},
+  open:v=>{const u=me();if(lockReason(u,v)){S.sheet=v;return}
+    S.openApp=v;S.view='app';S.thread=null;S.web=null;if(u.rules.limit&&u.level>1&&!ALWAYS.includes(v))u.used=Math.min(u.used+10,999)},
+  home:()=>{const u=me();S.view=u.level>1&&u.rules.space==='kids'?'kids':'home';S.openApp=null},
+  switch:()=>{S.view='lock';S.user=null;S.editing=null;S.exitKids=null},
+  controls:()=>{S.view='controls';S.tab='people';S.editing=null},
+  tab:v=>{S.tab=v;S.editing=null},
+  edit:v=>S.editing=v,
+  'back-people':()=>S.editing=null,
+  'toggle-app':v=>{const p=person(S.editing),r=p.rules,on=r.apps.includes(v);
+    r.apps=on?r.apps.filter(x=>x!==v):[...r.apps,v];if(on)delete p.grants[v];
+    log(`${me().name} turned ${on?'off':'on'} ${app(v).name} for ${p.name}`,p.level,S.user)},
+  limit:v=>{const p=person(S.editing),i=Math.max(0,Math.min(LIMITS.length-1,LIMITS.indexOf(p.rules.limit)+Number(v)));
+    p.rules.limit=LIMITS[i];log(`${me().name} set ${p.name}'s daily limit to ${LIMITS[i]?LIMITS[i]+' min':'no limit'}`,p.level,S.user,'limit-'+p.id)},
+  down:()=>{const p=person(S.editing);p.rules.down.on=!p.rules.down.on;log(`${me().name} turned ${p.rules.down.on?'on':'off'} downtime for ${p.name}`,p.level,S.user)},
+  purchases:()=>{const p=person(S.editing);p.rules.purchases=!p.rules.purchases;log(`${me().name} ${p.rules.purchases?'allowed':'blocked'} purchases for ${p.name}`,p.level,S.user)},
+  filter:v=>{const p=person(S.editing);p.rules.filter=v;log(`${me().name} set ${p.name}'s web filter to ${v}`,p.level,S.user,'filter-'+p.id)},
+  level:v=>{const p=person(S.editing),L=Number(v);if(L===p.level)return;const old=p.level;p.level=L;
+    log(`${me().name} moved ${p.name} from ${LEVEL[old]} to ${LEVEL[L]}`,Math.max(old,L),S.user);toast(`${p.name} is now ${LEVEL[L]}`)},
+  ask:v=>{const u=me();S.requests.unshift({id:Date.now(),who:u.id,app:S.sheet,amount:v,status:'pending',at:fmt(S.hour)});
+    log(`${u.name} asked for ${v==='Always'?'permanent access to':v+' of'} ${app(S.sheet).name}`,u.level,u.id);
+    toast(`Request sent to ${listJoin(approversOf(u))}`);S.sheet=null},
+  approve:v=>{const q=S.requests.find(x=>x.id==v),p=person(q.who);q.status='approved';q.by=me().name;
+    if(q.amount==='Always'){if(!p.rules.apps.includes(q.app))p.rules.apps.push(q.app)}else p.grants[q.app]=true;
+    log(`${me().name} approved ${q.amount==='Always'?'permanent':q.amount} ${app(q.app).name} for ${p.name}`,p.level,S.user);toast(`Approved. ${p.name} can open ${app(q.app).name}.`)},
+  deny:v=>{const q=S.requests.find(x=>x.id==v),p=person(q.who);q.status='denied';q.by=me().name;
+    log(`${me().name} denied ${app(q.app).name} for ${p.name}`,p.level,S.user)},
+  'close-sheet':()=>S.sheet=null,
+  'see-tasks':()=>S.sheet='tasks',
+  'task-done':v=>{const t=S.tasks.find(x=>x.id==v),p=person(t.who);if(t.photo&&!t.photos.length)return;
+    t.status='review';log(`${p.name} finished "${t.title}"${t.photos.length?` with ${t.photos.length} photo${t.photos.length>1?'s':''}`:''}`,p.level,p.id);
+    toast(`Sent to ${listJoin(approversOf(p))} to check`)},
+  'task-ok':v=>{const t=S.tasks.find(x=>x.id==v),p=person(t.who),k=t.reward.kind;
+    const until=k==='lunch'?12:k==='dinner'?18:k==='bed'?bedHour(p):Math.min(24,S.hour+t.reward.hours);
+    t.status='approved';t.okBy=me().name;
+    if(until>S.hour){p.earned={from:S.hour,until};toast(`Approved. ${p.name} is unlocked until ${fmt(until)}.`)}
+    else toast(`Approved. That time has already passed today, so no extra time was added.`);
+    log(`${me().name} approved "${t.title}" for ${p.name}, unlocked until ${fmt(Math.max(until,S.hour))}`,p.level,S.user)},
+  'task-back':v=>{const t=S.tasks.find(x=>x.id==v),p=person(t.who),el=document.getElementById('back-'+v);
+    t.status='redo';t.backBy=me().name;t.backNote=esc((el&&el.value.trim())||'Please try again.');t.photos=[];
+    log(`${me().name} sent "${t.title}" back to ${p.name}`,p.level,S.user);toast(`Sent back to ${p.name}`)},
+  'task-del':v=>{S.tasks=S.tasks.filter(x=>x.id!=v)},
+  'nt-who':v=>S.nt.who=v,
+  'nt-preset':v=>S.nt.title=v,
+  'nt-photo':()=>S.nt.photo=!S.nt.photo,
+  'nt-locks':()=>S.nt.locks=!S.nt.locks,
+  'nt-reward':v=>S.nt.reward=v,
+  'nt-hours':v=>S.nt.hours=Math.max(0.5,Math.min(6,S.nt.hours+Number(v))),
+  'nt-send':()=>{const n=S.nt,p=person(n.who),title=n.title.trim();if(!title){toast('Give the task a name first');return}
+    S.tasks.unshift({id:Date.now(),who:p.id,title:esc(title),note:esc(n.note.trim()),photo:n.photo,locks:n.locks,reward:n.reward==='hours'?{kind:'hours',hours:n.hours}:{kind:n.reward},status:'open',photos:[],by:me().name,at:fmt(S.hour)});
+    log(`${me().name} sent "${esc(title)}" to ${p.name}${n.locks?' and locked the device until it is done':''}`,p.level,S.user);
+    S.nt={...S.nt,title:'',note:''};toast(`Task sent to ${p.name}`)},
+  remind:v=>{const p=person(v);log(`Velo reminded ${p.name} for ${me().name}`,p.level,S.user);toast(`Velo sent ${p.name} a reminder`)},
+  call:v=>{const u=me();if(v==='911'){toast('Calling 911 (simulated)');return}
+    S.comms.unshift({day:0,at:fmt(S.hour),kind:'call',from:u.id,to:v,text:'Outgoing call'});toast(`Calling ${cname(v)}… (simulated)`)},
+  thread:v=>S.thread=v,
+  'thread-close':()=>S.thread=null,
+  'msg-send':()=>{const el=document.getElementById('msg-text'),t=el&&el.value.trim();if(!t)return;sendMsg({text:esc(t)})},
+  'web-go':()=>{const u=me(),el=document.getElementById('web-q'),q=el&&el.value.trim();if(!q)return;
+    const hit=u.level>1&&u.rules.keywords.find(k=>q.toLowerCase().includes(k));
+    S.web={q:esc(q),blocked:!!hit};if(hit)log(`${u.name} searched for a blocked word ("${hit}")`,u.level,u.id)},
+  'comm-for':v=>S.commFor=v,
+  'toggle-contact':v=>{const p=person(S.editing),r=p.rules,on=r.contacts.includes(v);
+    r.contacts=on?r.contacts.filter(x=>x!==v):[...r.contacts,v];log(`${me().name} ${on?'blocked':'allowed'} calls and texts with ${cname(v)} for ${p.name}`,p.level,S.user)},
+  'msg-photos':()=>{const p=person(S.editing);p.rules.msgPhotos=!p.rules.msgPhotos;log(`${me().name} turned ${p.rules.msgPhotos?'on':'off'} pictures in messages for ${p.name}`,p.level,S.user)},
+  'video-lvl':v=>{const p=person(S.editing);p.rules.video=v;log(`${me().name} set ${p.name}'s videos to ${VNAME[v]}`,p.level,S.user,'video-'+p.id)},
+  'kw-add':()=>{const p=person(S.editing),el=document.getElementById('kw-new'),w=el&&esc(el.value.trim().toLowerCase());if(!w||p.rules.keywords.includes(w))return;
+    p.rules.keywords.push(w);log(`${me().name} blocked the word "${w}" for ${p.name}`,p.level,S.user)},
+  'kw-del':v=>{const p=person(S.editing);p.rules.keywords=p.rules.keywords.filter(k=>k!==v);log(`${me().name} unblocked "${v}" for ${p.name}`,p.level,S.user)},
+  reset:()=>{clearTimeout(scanT);const d=S.device;S=initial();S.device=d}
+};
+document.addEventListener('click',e=>{
+  const t=e.target.closest('[data-a]');if(!t)return;
+  if(t.classList.contains('scrim')&&e.target!==t)return;
+  if(Date.now()-dragged<80&&t.closest('#pages'))return;
+  const f=A[t.dataset.a];if(f){f(t.dataset.v);render()}
+});
+function sendMsg(m){
+  const u=me(),c=S.thread;
+  S.comms.unshift({day:0,at:fmt(S.hour),kind:m.img?'photo':'text',from:u.id,to:c,text:m.text||'',img:m.img});render();
+  setTimeout(()=>{
+    S.comms.unshift({day:0,at:fmt(S.hour),kind:'text',from:c,to:u.id,text:REPLIES[Math.floor(Math.random()*REPLIES.length)]});
+    if(S.view==='app'&&S.thread===c)render()},1200);
+}
+document.addEventListener('input',e=>{const k=e.target.dataset&&e.target.dataset.nt;if(k)S.nt[k]=e.target.value});
+document.addEventListener('keydown',e=>{if(e.key!=='Enter')return;const a=e.target.dataset&&e.target.dataset.enter;
+  if(a&&A[a]){e.preventDefault();A[a]();render()}});
+document.addEventListener('change',e=>{
+  if(e.target.dataset&&e.target.dataset.task){const t=S.tasks.find(x=>x.id==e.target.dataset.task),f=e.target.files&&e.target.files[0];if(!f)return;
+    shrinkPhoto(f,src=>{if(!src){toast("That file couldn't be opened as a picture. Try a JPG or PNG.");render();return}
+      t.photos.push(src);toast('Photo added');render()});return}
+  if(e.target.id==='msg-photo'){const f=e.target.files&&e.target.files[0];if(!f)return;
+    shrinkPhoto(f,src=>{if(!src){toast("That file couldn't be opened as a picture.");render();return}sendMsg({img:src})});return}
+  if(e.target.id==='wall-file'){const f=e.target.files&&e.target.files[0];if(!f)return;const u=me();
+    shrinkPhoto(f,src=>{if(!src){toast("That file couldn't be opened as a picture. Try a JPG or PNG.");render();return}
+      u.wall={img:src};S.sheet=null;toast('Wallpaper set');render()});return}
+  const c=e.target.dataset&&e.target.dataset.c;if(!c||!S.editing)return;
+  const p=person(S.editing);p.rules.down[c]=Number(e.target.value);
+  log(`${me().name} set ${p.name}'s downtime to ${hr(p.rules.down.from)} to ${hr(p.rules.down.to)}`,p.level,S.user,'down-'+p.id);render();
+});
+document.getElementById('hour').addEventListener('input',e=>{S.hour=Number(e.target.value);render()});
+render();
+</script>
+
+</body>
+</html>
