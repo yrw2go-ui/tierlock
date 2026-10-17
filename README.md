@@ -24,3 +24,7 @@ It covers:
 - **Android:** a native app set up as the device's managing app. It acts as the home screen, default phone app and default texting app, so every feature above is possible.
 - **iPhone and iPad:** Apple's Screen Time tools handle app blocking, time limits and web filtering. Apple doesn't let any app read texts or call logs or replace the Phone and Messages apps, so call and text monitoring is Android-only.
 - **Parent dashboard:** can be a PWA for sending tasks, approving them and reading reports from any device.
+
+## Neon
+
+`neon.ts` declares the Neon services for the Tierlock project: Postgres, sign-in (Neon Auth), the AI gateway and a private `subphotos` bucket for chore photo proof. Run `npm install`, then `npx neon link` once and `npx neon deploy` to apply it. Pull requests get their own Neon branch automatically (`.github/workflows/neon-pr-branches.yml`).
