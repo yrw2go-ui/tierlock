@@ -6,6 +6,8 @@ Multi-level permissions for shared phones and tablets. Parents set the rules, ki
 
 `prototype/index.html` is a self-contained clickable prototype. Open it in a browser. No build step.
 
+Live version: https://yrw2go-ui.github.io/tierlock/ (redeploys automatically when `prototype/` changes on `main`).
+
 It covers:
 
 - Four access levels (Owner, Manager, Standard, Restricted). Each level manages the levels below it.
