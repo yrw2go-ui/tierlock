@@ -59,3 +59,36 @@ create table if not exists app_requests (
   primary key (family_id, id),
   foreign key (family_id, member_id) references members(family_id, id) on delete cascade
 );
+
+-- Phones and tablets linked to a family. Family devices sign in with a device
+-- token (only its SHA-256 is stored); parent devices use the parent's account.
+create table if not exists devices (
+  id uuid primary key default gen_random_uuid(),
+  family_id uuid not null references families(id) on delete cascade,
+  name text not null,
+  role text not null check (role in ('parent', 'family')),
+  platform text not null,
+  token_hash text unique,
+  created_at timestamptz not null default now(),
+  last_seen_at timestamptz
+);
+
+-- One-time codes a parent shows to link a new family device
+create table if not exists pairing_codes (
+  code text primary key,
+  family_id uuid not null references families(id) on delete cascade,
+  expires_at timestamptz not null
+);
+
+-- Minutes each person used each app per day, as reported by each device.
+-- No foreign key to members: saving a family replaces its member rows.
+create table if not exists screen_time (
+  family_id uuid not null references families(id) on delete cascade,
+  device_id uuid not null references devices(id) on delete cascade,
+  member_id text not null,
+  day date not null,
+  app text not null,
+  minutes int not null check (minutes >= 0),
+  primary key (device_id, member_id, day, app)
+);
+create index if not exists screen_time_family_day on screen_time (family_id, day);

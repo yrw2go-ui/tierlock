@@ -32,3 +32,12 @@ It covers:
 On the Vercel site, a parent can sign in from the Family account panel. Their family's people, rules, tasks, requests and chore proof photos then save to Neon automatically and load on any device. The `api/` functions handle sign-in (a same-site proxy to Neon Auth) and saving (`api/family.js`); the tables are in `db/schema.sql`. They need `NEON_AUTH_BASE_URL` and `DATABASE_URL` set on Vercel. The GitHub Pages copy has no server, so it stays a demo without the panel. Proof photos go to the private `subphotos` bucket through `api/photos.js`, which needs `NEON_STORAGE_ENDPOINT`, `NEON_STORAGE_ACCESS_KEY_ID` and `NEON_STORAGE_SECRET_ACCESS_KEY` (a Neon credential with storage read and write); photos removed from a chore are deleted from storage on the next save.
 
 `neon.ts` declares the Neon services for the Tierlock project: Postgres, sign-in (Neon Auth), the AI gateway and a private `subphotos` bucket for chore photo proof. Run `npm install`, then `npx neon link` once and `npx neon deploy` to apply it. Pull requests get their own Neon branch automatically (`.github/workflows/neon-pr-branches.yml`).
+
+### Family devices
+
+A signed-in parent taps **Link a family device** to get a one-time 8-character code (valid 10 minutes). The device app sends it to `POST /api/pair` with a device name and gets back its own token; only the token's SHA-256 is stored. With `Authorization: Bearer <token>` the device can:
+
+- `GET /api/device/state?day=YYYY-MM-DD`: people (with PINs and rules), tasks, requests and today's screen time
+- `POST /api/device/usage`: `{day, entries: [{member, app, minutes}]}`, cumulative minutes per person and app for that day
+
+Parents see linked devices in the Family account panel and can remove one, which stops its token at once. The prototype shows each person's screen time used today from these reports.
