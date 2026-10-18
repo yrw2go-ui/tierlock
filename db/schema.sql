@@ -22,7 +22,8 @@ create table if not exists members (
   primary key (family_id, id)
 );
 
--- Chores sent to a member; proof photos are not stored yet
+-- Chores sent to a member. Proof photos live in the private subphotos bucket;
+-- photo_keys lists their object keys, all under the family's id.
 create table if not exists tasks (
   family_id uuid not null,
   id bigint not null,
@@ -39,6 +40,7 @@ create table if not exists tasks (
   approved_by text,
   returned_by text,
   return_note text,
+  photo_keys jsonb not null default '[]',
   primary key (family_id, id),
   foreign key (family_id, member_id) references members(family_id, id) on delete cascade
 );

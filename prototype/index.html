@@ -953,7 +953,7 @@ const A={
     else toast(`Approved. That time has already passed today, so no extra time was added.`);
     log(`${me().name} approved "${t.title}" for ${p.name}, unlocked until ${fmt(Math.max(until,S.hour))}`,p.level,S.user)},
   'task-back':v=>{const t=S.tasks.find(x=>x.id==v),p=person(t.who),el=document.getElementById('back-'+v);
-    t.status='redo';t.backBy=me().name;t.backNote=esc((el&&el.value.trim())||'Please try again.');t.photos=[];
+    t.status='redo';t.backBy=me().name;t.backNote=esc((el&&el.value.trim())||'Please try again.');t.photos=[];t.photoKeys=[];
     log(`${me().name} sent "${t.title}" back to ${p.name}`,p.level,S.user);toast(`Sent back to ${p.name}`)},
   'task-del':v=>{S.tasks=S.tasks.filter(x=>x.id!=v)},
   'nt-who':v=>S.nt.who=v,
@@ -1004,7 +1004,7 @@ document.addEventListener('keydown',e=>{if(e.key!=='Enter')return;const a=e.targ
 document.addEventListener('change',e=>{
   if(e.target.dataset&&e.target.dataset.task){const t=S.tasks.find(x=>x.id==e.target.dataset.task),f=e.target.files&&e.target.files[0];if(!f)return;
     shrinkPhoto(f,src=>{if(!src){toast("That file couldn't be opened as a picture. Try a JPG or PNG.");render();return}
-      t.photos.push(src);toast('Photo added');render()});return}
+      t.photos.push(src);toast('Photo added');render();if(ACC.user&&ACC.loaded)uploadPhoto(t,src)});return}
   if(e.target.id==='msg-photo'){const f=e.target.files&&e.target.files[0];if(!f)return;
     shrinkPhoto(f,src=>{if(!src){toast("That file couldn't be opened as a picture.");render();return}sendMsg({img:src})});return}
   if(e.target.id==='wall-file'){const f=e.target.files&&e.target.files[0];if(!f)return;const u=me();
@@ -1022,7 +1022,7 @@ const ACC={user:null,loaded:false,busy:false,err:'',status:''};
 let lastSaved='',saveT;
 const saveable=()=>JSON.stringify({
   people:S.people.map(p=>({id:p.id,name:p.name,level:p.level,pin:p.pin,wh:p.wh,...(p.wall?{wall:p.wall}:{}),rules:p.rules})),
-  tasks:S.tasks.map(t=>({id:t.id,who:t.who,title:t.title,note:t.note,photo:t.photo,locks:t.locks,reward:t.reward,status:t.status,by:t.by,at:t.at,okBy:t.okBy,backBy:t.backBy,backNote:t.backNote})),
+  tasks:S.tasks.map(t=>({id:t.id,who:t.who,title:t.title,note:t.note,photo:t.photo,locks:t.locks,reward:t.reward,status:t.status,by:t.by,at:t.at,okBy:t.okBy,backBy:t.backBy,backNote:t.backNote,photoKeys:t.photoKeys||[]})),
   requests:S.requests.map(q=>({id:q.id,who:q.who,app:q.app,amount:q.amount,status:q.status,at:q.at,by:q.by}))
 });
 async function api(path,opts={}){
@@ -1042,6 +1042,17 @@ async function saveNow(){
   catch(e){ACC.status="Couldn't save. It will try again with your next change."}
   renderAcct();
 }
+// Proof photos go to Neon storage; the task keeps the returned key so the next save records it.
+async function uploadPhoto(t,src){
+  try{
+    const r=await api('/api/photos',{method:'POST',body:JSON.stringify({taskId:t.id,image:src})});
+    if(!t.photos.includes(src))return;
+    t.photoKeys=[...(t.photoKeys||[]),r.key];t.photos[t.photos.indexOf(src)]=r.url;
+  }catch(e){
+    t.photos=t.photos.filter(x=>x!==src);toast("That photo couldn't be saved. Try adding it again.");
+  }
+  render();
+}
 async function loadFamily(){
   ACC.loaded=false;ACC.status='Loading your family…';renderAcct();
   try{
@@ -1049,7 +1060,7 @@ async function loadFamily(){
     if(f.family){
       const d=S.device;S=initial();S.device=d;
       S.people=f.people.map(p=>({...p,used:0,grants:{},earned:null}));
-      S.tasks=f.tasks.map(t=>({...t,photos:[]}));
+      S.tasks=f.tasks.map(t=>({...t,photos:t.photos||[],photoKeys:t.photoKeys||[]}));
       S.requests=f.requests;
       if(!person(S.nt.who))S.nt.who=(S.people.find(p=>p.level>2)||S.people[0]).id;
       lastSaved=saveable();ACC.status='Loaded your saved family';
@@ -1063,14 +1074,14 @@ function renderAcct(){
   if(ACC.user){
     el.innerHTML=`<div class="eyebrow" id="acct-h">Family account</div>
       <p>Signed in as <b>${esc(ACC.user.email)}</b></p>
-      <p class="hint" role="status">${ACC.status}. Changes to people, rules, tasks and requests save automatically. Reset reloads your saved family.</p>
+      <p class="hint" role="status">${ACC.status}. Changes to people, rules, tasks, requests and chore photos save automatically. Reset reloads your saved family.</p>
       <div class="row"><button class="btn-ghost" data-acct="out"${ACC.busy?' disabled':''}>Sign out</button></div>`;
     return;
   }
   const email=document.getElementById('acct-email'),pass=document.getElementById('acct-pass');
   const ev=email?email.value:'',pv=pass?pass.value:'';
   el.innerHTML=`<div class="eyebrow" id="acct-h">Family account</div>
-    <p class="hint">Sign in to save this family's people, rules, tasks and requests. Without an account the prototype starts over when you leave.</p>
+    <p class="hint">Sign in to save this family's people, rules, tasks, requests and chore photos. Without an account the prototype starts over when you leave.</p>
     <input id="acct-email" type="email" autocomplete="email" placeholder="Email" aria-label="Email">
     <input id="acct-pass" type="password" autocomplete="current-password" placeholder="Password (8 or more characters)" aria-label="Password" data-enter-acct="in">
     <div class="row"><button class="btn-solid" data-acct="in"${ACC.busy?' disabled':''}>Sign in</button><button class="btn-ghost" data-acct="up"${ACC.busy?' disabled':''}>Create account</button></div>
