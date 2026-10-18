@@ -1,0 +1,7 @@
+<resources>
+    <style name="Theme.Tierlock" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/background</item>
+        <item name="android:statusBarColor">@color/ink</item>
+        <item name="android:navigationBarColor">@color/background</item>
+    </style>
+</resources>
