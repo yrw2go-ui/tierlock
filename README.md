@@ -41,3 +41,16 @@ A signed-in parent taps **Link a family device** to get a one-time 8-character c
 - `POST /api/device/usage`: `{day, entries: [{member, app, minutes}]}`, cumulative minutes per person and app for that day
 
 Parents see linked devices in the Family account panel and can remove one, which stops its token at once. The prototype shows each person's screen time used today from these reports.
+
+## Android app
+
+`android/` is the Tierlock app for Android phones and tablets (Kotlin, Jetpack Compose). GitHub Actions builds it (`.github/workflows/android.yml`) and every push to `main` publishes the APK as the **android-latest** release: https://github.com/yrw2go-ui/tierlock/releases/tag/android-latest
+
+At setup the device is either:
+
+- **Parent device**: shows the parent controls (the web app) with no locks.
+- **Family device**: links to a family with a parent's one-time code, becomes the home screen, and shows "Who's using this?". Each person unlocks with their PIN (or fingerprint/face if their login allows it) and sees only the apps their rules allow; owners and managers see every app. Grown-ups can open device settings from the lock screen with their PIN. The device locks itself when the screen turns off.
+
+With usage access turned on, the app counts each person's minutes per app and sends them to Neon every 15 minutes, so the web app shows screen time used today.
+
+Not yet: enforcing limits, downtime and chore locks, and blocking apps opened another way. A store release will need its own private signing key.
