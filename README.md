@@ -8,6 +8,8 @@ Multi-level permissions for shared phones and tablets. Parents set the rules, ki
 
 Live version: https://yrw2go-ui.github.io/tierlock/ (redeploys automatically when `prototype/` changes on `main`).
 
+It can be installed as an app on phones and tablets: in Safari tap Share, then Add to Home Screen; in Chrome tap the menu, then Install app (or Add to Home screen). `prototype/manifest.webmanifest`, the icons in `prototype/icons/` and `prototype/sw.js` make that work, and the installed app still opens without a connection.
+
 It covers:
 
 - Four access levels (Owner, Manager, Standard, Restricted). Each level manages the levels below it.
