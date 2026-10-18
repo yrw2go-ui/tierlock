@@ -80,6 +80,11 @@ ol.try li::marker{color:var(--accent);font-family:var(--f-mono)}
 .acct .row{display:flex;gap:8px;flex-wrap:wrap}
 .acct .hint{font-size:12px}
 .acct .err{color:var(--bad);font-size:12px;margin:0}
+.acct .devs{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.acct .devs li{display:flex;align-items:center;gap:8px;font-size:13px}
+.acct .devs li span{flex:1;min-width:0}
+.acct .code{font-family:var(--f-mono);font-size:20px;letter-spacing:.12em}
+.linkbtn-sm{border:0;background:none;color:var(--accent);font-size:12px;padding:2px 0}
 
 /* Device */
 .stage{display:flex;justify-content:center;min-width:0}
@@ -1026,7 +1031,8 @@ document.getElementById('hour').addEventListener('input',e=>{S.hour=Number(e.tar
 
 /* Family account: saves people, rules, tasks and requests to Neon through the site's /api functions.
    Hidden where there is no /api (GitHub Pages, opened as a file). */
-const ACC={user:null,loaded:false,busy:false,err:'',status:''};
+const ACC={user:null,loaded:false,busy:false,err:'',status:'',devices:[],code:null};
+const localDay=()=>new Date().toLocaleDateString('en-CA');
 let lastSaved='',saveT;
 const saveable=()=>JSON.stringify({
   people:S.people.map(p=>({id:p.id,name:p.name,level:p.level,pin:p.pin,wh:p.wh,...(p.wall?{wall:p.wall}:{}),rules:p.rules})),
@@ -1064,18 +1070,33 @@ async function uploadPhoto(t,src){
 async function loadFamily(){
   ACC.loaded=false;ACC.status='Loading your family…';renderAcct();
   try{
-    const f=await api('/api/family');
+    const f=await api('/api/family?day='+localDay());
     if(f.family){
       const d=S.device;S=initial();S.device=d;
-      S.people=f.people.map(p=>({...p,used:0,grants:{},earned:null}));
+      // screen time used today comes from the family's linked devices
+      S.people=f.people.map(p=>({...p,used:(f.screenTime||{})[p.id]||0,grants:{},earned:null}));
       S.tasks=f.tasks.map(t=>({...t,photos:t.photos||[],photoKeys:t.photoKeys||[]}));
       S.requests=f.requests;
       if(!person(S.nt.who))S.nt.who=(S.people.find(p=>p.level>2)||S.people[0]).id;
       lastSaved=saveable();ACC.status='Loaded your saved family';
     }else{lastSaved='';ACC.status='Saving this family to your account…'}
     ACC.loaded=true;
+    // a new account's family is created by its first save, which devices need
+    if(!f.family){renderAcct();await saveNow()}
   }catch(e){ACC.status="Couldn't load your family. Sign out and in to try again."}
   render();renderAcct();
+  if(ACC.loaded)loadDevices();
+}
+async function loadDevices(){
+  try{ACC.devices=(await api('/api/devices')).devices.filter(d=>d.role==='family')}catch(e){ACC.devices=[]}
+  renderAcct();
+}
+function devicesHTML(){
+  const seen=d=>d.last_seen_at?`seen ${new Date(d.last_seen_at).toLocaleString([], {dateStyle:'short',timeStyle:'short'})}`:'not opened yet';
+  const list=ACC.devices.length?`<ul class="devs">${ACC.devices.map(d=>`<li><span><b>${esc(d.name)}</b> · ${seen(d)}</span><button class="linkbtn-sm" data-acct="unlink" data-id="${d.id}">Remove</button></li>`).join('')}</ul>`
+    :'<p class="hint">No family devices linked yet.</p>';
+  const code=ACC.code?`<p>Code: <b class="code">${ACC.code.slice(0,4)} ${ACC.code.slice(4)}</b></p><p class="hint">On the Android phone or tablet, open Tierlock, choose Family device and enter this code. It works once, for 10 minutes.</p>`:'';
+  return `<div class="eyebrow">Family devices</div>${list}${code}<div class="row"><button class="btn-ghost" data-acct="link"${ACC.busy?' disabled':''}>Link a family device</button></div>`;
 }
 function renderAcct(){
   const el=document.getElementById('acct');
@@ -1083,6 +1104,8 @@ function renderAcct(){
     el.innerHTML=`<div class="eyebrow" id="acct-h">Family account</div>
       <p>Signed in as <b>${esc(ACC.user.email)}</b></p>
       <p class="hint" role="status">${ACC.status}. Changes to people, rules, tasks, requests and chore photos save automatically. Reset reloads your saved family.</p>
+      ${ACC.loaded?devicesHTML():''}
+      ${ACC.err?`<p class="err" role="alert">${esc(ACC.err)}</p>`:''}
       <div class="row"><button class="btn-ghost" data-acct="out"${ACC.busy?' disabled':''}>Sign out</button></div>`;
     return;
   }
@@ -1096,8 +1119,17 @@ function renderAcct(){
     ${ACC.err?`<p class="err" role="alert">${esc(ACC.err)}</p>`:''}`;
   document.getElementById('acct-email').value=ev;document.getElementById('acct-pass').value=pv;
 }
-async function acctAction(kind){
+async function acctAction(kind,id){
   if(ACC.busy)return;
+  if(kind==='link'||kind==='unlink'){
+    if(kind==='unlink'&&!confirm('Remove this device? It will stop working with your family until you link it again.'))return;
+    ACC.busy=true;ACC.err='';renderAcct();
+    try{
+      if(kind==='link'){ACC.code=(await api('/api/devices',{method:'POST',body:'{}'})).code}
+      else{await api('/api/devices?id='+encodeURIComponent(id),{method:'DELETE'})}
+    }catch(e){ACC.err=e.message}
+    ACC.busy=false;await loadDevices();return;
+  }
   const email=(document.getElementById('acct-email')||{}).value||'',password=(document.getElementById('acct-pass')||{}).value||'';
   if(kind!=='out'&&(!email.trim()||!password)){ACC.err='Enter your email and password.';renderAcct();return}
   ACC.busy=true;ACC.err='';renderAcct();
@@ -1105,7 +1137,7 @@ async function acctAction(kind){
     if(kind==='out'){
       clearTimeout(saveT);if(saveable()!==lastSaved)await saveNow();
       await api('/api/auth/sign-out',{method:'POST',body:'{}'});
-      ACC.user=null;ACC.loaded=false;const d=S.device;S=initial();S.device=d;render();
+      ACC.user=null;ACC.loaded=false;ACC.devices=[];ACC.code=null;const d=S.device;S=initial();S.device=d;render();
     }else{
       const path=kind==='up'?'sign-up/email':'sign-in/email';
       const body=kind==='up'?{email:email.trim(),password,name:email.trim().split('@')[0]}:{email:email.trim(),password};
@@ -1115,7 +1147,7 @@ async function acctAction(kind){
   }catch(e){ACC.err=e.message}
   ACC.busy=false;renderAcct();
 }
-document.getElementById('acct').addEventListener('click',e=>{const b=e.target.closest('[data-acct]');if(b)acctAction(b.dataset.acct)});
+document.getElementById('acct').addEventListener('click',e=>{const b=e.target.closest('[data-acct]');if(b)acctAction(b.dataset.acct,b.dataset.id)});
 document.getElementById('acct').addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.dataset.enterAcct)acctAction(e.target.dataset.enterAcct)});
 (async()=>{
   try{

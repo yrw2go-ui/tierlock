@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { neon } from "@neondatabase/serverless";
 
 // Neon Auth (Better Auth) sets its cookies with this prefix
@@ -38,4 +39,18 @@ export async function sessionUser(request) {
 
   const data = await res.json().catch(() => null);
   return data?.user?.id ? { id: data.user.id, email: data.user.email } : null;
+}
+
+export function hashToken(token) {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+// family devices send "Authorization: Bearer <device token>"
+export async function deviceFromToken(request, sql) {
+  const token = (request.headers.get("authorization") || "").match(/^Bearer ([A-Za-z0-9_-]{32,})$/)?.[1];
+  if (!token) return null;
+  const [device] = await sql`
+    update devices set last_seen_at = now() where token_hash = ${hashToken(token)}
+    returning id, family_id, name, role`;
+  return device || null;
 }

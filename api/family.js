@@ -1,8 +1,10 @@
 import { getSql, isConfigured, json, sessionUser } from "./_lib/neon.js";
-import { deletePhotos, photoUrl, storageConfigured } from "./_lib/storage.js";
+import { familyData, familyForUser } from "./_lib/family.js";
+import { deletePhotos, storageConfigured } from "./_lib/storage.js";
 
 // The signed-in parent's family: people with their rules, tasks and requests.
-// GET loads it (family: null before the first save); PUT saves the whole thing.
+// GET loads it (family: null before the first save), with today's screen time when
+// ?day=YYYY-MM-DD is given; PUT saves the whole thing.
 
 const ID = /^[a-z0-9_-]{1,40}$/;
 const str = (v, max) => typeof v === "string" && v.length <= max;
@@ -40,35 +42,10 @@ function validRequest(q, ids) {
   );
 }
 
-async function load(sql, userId) {
-  const [family] = await sql`select id, updated_at from families where owner_id = ${userId}`;
+async function load(sql, userId, day) {
+  const family = await familyForUser(sql, userId);
   if (!family) return { family: null };
-
-  const [members, tasks, requests] = await Promise.all([
-    sql`select * from members where family_id = ${family.id} order by position`,
-    sql`select * from tasks where family_id = ${family.id} order by position`,
-    sql`select * from app_requests where family_id = ${family.id} order by position`,
-  ]);
-
-  return {
-    family: { updatedAt: family.updated_at },
-    people: members.map((m) => ({
-      id: m.id, name: m.name, level: m.level, pin: m.pin, wh: m.hue,
-      ...(m.wallpaper ? { wall: m.wallpaper } : {}), rules: m.rules,
-    })),
-    tasks: await Promise.all(tasks.map(async (t) => ({
-      id: Number(t.id), who: t.member_id, title: t.title, note: t.note, photo: t.photo_required,
-      locks: t.locks_device, reward: t.reward, status: t.status, by: t.sent_by, at: t.sent_at,
-      ...(t.approved_by ? { okBy: t.approved_by } : {}),
-      ...(t.returned_by ? { backBy: t.returned_by, backNote: t.return_note } : {}),
-      photoKeys: t.photo_keys,
-      photos: storageConfigured() ? await Promise.all(t.photo_keys.map(photoUrl)) : [],
-    }))),
-    requests: requests.map((q) => ({
-      id: Number(q.id), who: q.member_id, app: q.app, amount: q.amount, status: q.status, at: q.asked_at,
-      ...(q.decided_by ? { by: q.decided_by } : {}),
-    })),
-  };
+  return { family: { updatedAt: family.updated_at }, ...(await familyData(sql, family.id, day)) };
 }
 
 async function save(sql, userId, body) {
@@ -78,7 +55,7 @@ async function save(sql, userId, body) {
       !people.every(validPerson)) {
     return json({ error: "invalid family" }, 400);
   }
-  const [family] = await sql`select id from families where owner_id = ${userId}`;
+  const family = await familyForUser(sql, userId);
   const prefix = family ? `${family.id}/` : null;
   const ids = new Set(people.map((p) => p.id));
   if (ids.size !== people.length || !tasks.every((t) => validTask(t, ids, prefix)) ||
@@ -144,7 +121,7 @@ async function handle(request) {
   if (!user) return json({ error: "signed out" }, 401);
 
   const sql = getSql();
-  if (request.method === "GET") return json(await load(sql, user.id));
+  if (request.method === "GET") return json(await load(sql, user.id, new URL(request.url).searchParams.get("day")));
 
   const body = await request.json().catch(() => null);
   return save(sql, user.id, body);
