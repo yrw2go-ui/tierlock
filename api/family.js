@@ -1,4 +1,5 @@
 import { getSql, isConfigured, json, sessionUser } from "./_lib/neon.js";
+import { deletePhotos, photoUrl, storageConfigured } from "./_lib/storage.js";
 
 // The signed-in parent's family: people with their rules, tasks and requests.
 // GET loads it (family: null before the first save); PUT saves the whole thing.
@@ -7,6 +8,12 @@ const ID = /^[a-z0-9_-]{1,40}$/;
 const str = (v, max) => typeof v === "string" && v.length <= max;
 const int = (v) => Number.isInteger(v) && v >= 0;
 const opt = (v, max) => v === undefined || v === null || str(v, max);
+// photo keys come from api/photos.js and must sit under this family's id
+const PHOTO_KEY = /^[0-9a-f-]{36}\/\d+\/[0-9a-f-]{36}\.(jpg|png|webp)$/;
+const validKeys = (keys, prefix) =>
+  keys === undefined ||
+  (Array.isArray(keys) && keys.length <= 10 &&
+   keys.every((k) => typeof k === "string" && PHOTO_KEY.test(k) && prefix && k.startsWith(prefix)));
 
 function validPerson(p) {
   return (
@@ -17,12 +24,12 @@ function validPerson(p) {
   );
 }
 
-function validTask(t, ids) {
+function validTask(t, ids, prefix) {
   return (
     t && int(t.id) && ids.has(t.who) && str(t.title, 200) && str(t.note, 2000) &&
     typeof t.photo === "boolean" && typeof t.locks === "boolean" &&
     t.reward && typeof t.reward === "object" && str(t.status, 20) && str(t.by, 60) && str(t.at, 20) &&
-    opt(t.okBy, 60) && opt(t.backBy, 60) && opt(t.backNote, 2000)
+    opt(t.okBy, 60) && opt(t.backBy, 60) && opt(t.backNote, 2000) && validKeys(t.photoKeys, prefix)
   );
 }
 
@@ -49,12 +56,14 @@ async function load(sql, userId) {
       id: m.id, name: m.name, level: m.level, pin: m.pin, wh: m.hue,
       ...(m.wallpaper ? { wall: m.wallpaper } : {}), rules: m.rules,
     })),
-    tasks: tasks.map((t) => ({
+    tasks: await Promise.all(tasks.map(async (t) => ({
       id: Number(t.id), who: t.member_id, title: t.title, note: t.note, photo: t.photo_required,
       locks: t.locks_device, reward: t.reward, status: t.status, by: t.sent_by, at: t.sent_at,
       ...(t.approved_by ? { okBy: t.approved_by } : {}),
       ...(t.returned_by ? { backBy: t.returned_by, backNote: t.return_note } : {}),
-    })),
+      photoKeys: t.photo_keys,
+      photos: storageConfigured() ? await Promise.all(t.photo_keys.map(photoUrl)) : [],
+    }))),
     requests: requests.map((q) => ({
       id: Number(q.id), who: q.member_id, app: q.app, amount: q.amount, status: q.status, at: q.asked_at,
       ...(q.decided_by ? { by: q.decided_by } : {}),
@@ -69,8 +78,10 @@ async function save(sql, userId, body) {
       !people.every(validPerson)) {
     return json({ error: "invalid family" }, 400);
   }
+  const [family] = await sql`select id from families where owner_id = ${userId}`;
+  const prefix = family ? `${family.id}/` : null;
   const ids = new Set(people.map((p) => p.id));
-  if (ids.size !== people.length || !tasks.every((t) => validTask(t, ids)) ||
+  if (ids.size !== people.length || !tasks.every((t) => validTask(t, ids, prefix)) ||
       !requests.every((q) => validRequest(q, ids))) {
     return json({ error: "invalid family" }, 400);
   }
@@ -83,11 +94,16 @@ async function save(sql, userId, body) {
     id: t.id, position: i, member_id: t.who, title: t.title, note: t.note, photo_required: t.photo,
     locks_device: t.locks, reward: t.reward, status: t.status, sent_by: t.by, sent_at: t.at,
     approved_by: t.okBy || null, returned_by: t.backBy || null, return_note: t.backNote || null,
+    photo_keys: t.photoKeys || [],
   }));
   const requestRows = requests.map((q, i) => ({
     id: q.id, position: i, member_id: q.who, app: q.app, amount: q.amount, status: q.status, asked_at: q.at,
     decided_by: q.by || null,
   }));
+
+  const oldKeys = family
+    ? (await sql`select photo_keys from tasks where family_id = ${family.id}`).flatMap((r) => r.photo_keys)
+    : [];
 
   // replace the family's rows in one transaction; deleting members cascades to tasks and requests
   await sql.transaction([
@@ -99,17 +115,25 @@ async function save(sql, userId, body) {
         from jsonb_to_recordset(${JSON.stringify(memberRows)}::jsonb) as x(
           id text, position int, name text, level smallint, pin text, hue int, wallpaper jsonb, rules jsonb)`,
     sql`insert into tasks (family_id, id, position, member_id, title, note, photo_required, locks_device, reward, status, sent_by, sent_at,
-                           approved_by, returned_by, return_note)
+                           approved_by, returned_by, return_note, photo_keys)
         select (select id from families where owner_id = ${userId}), x.id, x.position, x.member_id, x.title, x.note, x.photo_required, x.locks_device, x.reward, x.status, x.sent_by, x.sent_at,
-               x.approved_by, x.returned_by, x.return_note
+               x.approved_by, x.returned_by, x.return_note, coalesce(x.photo_keys, '[]')
         from jsonb_to_recordset(${JSON.stringify(taskRows)}::jsonb) as x(
           id bigint, position int, member_id text, title text, note text, photo_required boolean, locks_device boolean,
-          reward jsonb, status text, sent_by text, sent_at text, approved_by text, returned_by text, return_note text)`,
+          reward jsonb, status text, sent_by text, sent_at text, approved_by text, returned_by text, return_note text,
+          photo_keys jsonb)`,
     sql`insert into app_requests (family_id, id, position, member_id, app, amount, status, asked_at, decided_by)
         select (select id from families where owner_id = ${userId}), x.id, x.position, x.member_id, x.app, x.amount, x.status, x.asked_at, x.decided_by
         from jsonb_to_recordset(${JSON.stringify(requestRows)}::jsonb) as x(
           id bigint, position int, member_id text, app text, amount text, status text, asked_at text, decided_by text)`,
   ]);
+
+  // photos no longer on any task (sent back, task deleted) are removed from storage
+  const kept = new Set(taskRows.flatMap((t) => t.photo_keys));
+  const removed = oldKeys.filter((k) => !kept.has(k));
+  if (removed.length && storageConfigured()) {
+    await deletePhotos(removed).catch((e) => console.error("[family] photo cleanup failed", e));
+  }
   return json({ ok: true });
 }
 
