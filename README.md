@@ -27,4 +27,6 @@ It covers:
 
 ## Neon
 
+On the Vercel site, a parent can sign in from the Family account panel. Their family's people, rules, tasks and requests then save to Neon automatically and load on any device. The `api/` functions handle sign-in (a same-site proxy to Neon Auth) and saving (`api/family.js`); the tables are in `db/schema.sql`. They need `NEON_AUTH_BASE_URL` and `DATABASE_URL` set on Vercel. The GitHub Pages copy has no server, so it stays a demo without the panel. Chore proof photos aren't saved yet.
+
 `neon.ts` declares the Neon services for the Tierlock project: Postgres, sign-in (Neon Auth), the AI gateway and a private `subphotos` bucket for chore photo proof. Run `npm install`, then `npx neon link` once and `npx neon deploy` to apply it. Pull requests get their own Neon branch automatically (`.github/workflows/neon-pr-branches.yml`).
