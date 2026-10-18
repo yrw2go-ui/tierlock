@@ -65,6 +65,13 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 ol.try{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;color:var(--ink)}
 ol.try li::marker{color:var(--accent);font-family:var(--f-mono)}
 .btn-ghost{align-self:flex-start;border:1px solid var(--line);background:var(--surface);padding:7px 14px;border-radius:8px}
+.btn-solid{border:0;background:var(--accent);color:var(--accent-ink);padding:7px 14px;border-radius:8px;font-weight:600}
+.btn-solid:disabled,.btn-ghost:disabled{opacity:.55;cursor:default}
+.acct{border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:12px;display:flex;flex-direction:column;gap:10px}
+.acct input{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--bg);width:100%;box-sizing:border-box}
+.acct .row{display:flex;gap:8px;flex-wrap:wrap}
+.acct .hint{font-size:12px}
+.acct .err{color:var(--bad);font-size:12px;margin:0}
 
 /* Device */
 .stage{display:flex;justify-content:center;min-width:0}
@@ -300,6 +307,7 @@ button.item:hover{background:var(--scr)}
       <input type="range" id="hour" min="0" max="23.5" step="0.5" value="16.5">
     </div>
 
+    <section class="acct" id="acct" aria-labelledby="acct-h" hidden></section>
     <div class="ctl">
       <label>Try this</label>
       <ol class="try">
@@ -845,6 +853,7 @@ function render(){
   scr.innerHTML=statusBar()+v+vSheet()+(S.toast?`<div class="toast" role="status">${S.toast}</div>`:'');
   const pg=document.getElementById('pages');
   if(pg){pg.scrollLeft=S.page*pg.clientWidth;wirePages(pg)}
+  queueSave();
 }
 function wirePages(pg){
   let t;
@@ -974,7 +983,7 @@ const A={
   'kw-add':()=>{const p=person(S.editing),el=document.getElementById('kw-new'),w=el&&esc(el.value.trim().toLowerCase());if(!w||p.rules.keywords.includes(w))return;
     p.rules.keywords.push(w);log(`${me().name} blocked the word "${w}" for ${p.name}`,p.level,S.user)},
   'kw-del':v=>{const p=person(S.editing);p.rules.keywords=p.rules.keywords.filter(k=>k!==v);log(`${me().name} unblocked "${v}" for ${p.name}`,p.level,S.user)},
-  reset:()=>{clearTimeout(scanT);const d=S.device;S=initial();S.device=d}
+  reset:()=>{clearTimeout(scanT);if(ACC.user){loadFamily();return}const d=S.device;S=initial();S.device=d}
 };
 document.addEventListener('click',e=>{
   const t=e.target.closest('[data-a]');if(!t)return;
@@ -1006,6 +1015,98 @@ document.addEventListener('change',e=>{
   log(`${me().name} set ${p.name}'s downtime to ${hr(p.rules.down.from)} to ${hr(p.rules.down.to)}`,p.level,S.user,'down-'+p.id);render();
 });
 document.getElementById('hour').addEventListener('input',e=>{S.hour=Number(e.target.value);render()});
+
+/* Family account: saves people, rules, tasks and requests to Neon through the site's /api functions.
+   Hidden where there is no /api (GitHub Pages, opened as a file). */
+const ACC={user:null,loaded:false,busy:false,err:'',status:''};
+let lastSaved='',saveT;
+const saveable=()=>JSON.stringify({
+  people:S.people.map(p=>({id:p.id,name:p.name,level:p.level,pin:p.pin,wh:p.wh,...(p.wall?{wall:p.wall}:{}),rules:p.rules})),
+  tasks:S.tasks.map(t=>({id:t.id,who:t.who,title:t.title,note:t.note,photo:t.photo,locks:t.locks,reward:t.reward,status:t.status,by:t.by,at:t.at,okBy:t.okBy,backBy:t.backBy,backNote:t.backNote})),
+  requests:S.requests.map(q=>({id:q.id,who:q.who,app:q.app,amount:q.amount,status:q.status,at:q.at,by:q.by}))
+});
+async function api(path,opts={}){
+  const r=await fetch(path,{credentials:'same-origin',...opts,headers:opts.body?{'content-type':'application/json'}:undefined});
+  const data=await r.json().catch(()=>null);
+  if(!r.ok)throw new Error((data&&(data.message||data.error))||`Something went wrong (${r.status})`);
+  return data;
+}
+function queueSave(){
+  if(!ACC.user||!ACC.loaded||saveable()===lastSaved)return;
+  ACC.status='Saving…';renderAcct();
+  clearTimeout(saveT);saveT=setTimeout(saveNow,800);
+}
+async function saveNow(){
+  const body=saveable();
+  try{await api('/api/family',{method:'PUT',body});lastSaved=body;ACC.status='All changes saved'}
+  catch(e){ACC.status="Couldn't save. It will try again with your next change."}
+  renderAcct();
+}
+async function loadFamily(){
+  ACC.loaded=false;ACC.status='Loading your family…';renderAcct();
+  try{
+    const f=await api('/api/family');
+    if(f.family){
+      const d=S.device;S=initial();S.device=d;
+      S.people=f.people.map(p=>({...p,used:0,grants:{},earned:null}));
+      S.tasks=f.tasks.map(t=>({...t,photos:[]}));
+      S.requests=f.requests;
+      if(!person(S.nt.who))S.nt.who=(S.people.find(p=>p.level>2)||S.people[0]).id;
+      lastSaved=saveable();ACC.status='Loaded your saved family';
+    }else{lastSaved='';ACC.status='Saving this family to your account…'}
+    ACC.loaded=true;
+  }catch(e){ACC.status="Couldn't load your family. Sign out and in to try again."}
+  render();renderAcct();
+}
+function renderAcct(){
+  const el=document.getElementById('acct');
+  if(ACC.user){
+    el.innerHTML=`<div class="eyebrow" id="acct-h">Family account</div>
+      <p>Signed in as <b>${esc(ACC.user.email)}</b></p>
+      <p class="hint" role="status">${ACC.status}. Changes to people, rules, tasks and requests save automatically. Reset reloads your saved family.</p>
+      <div class="row"><button class="btn-ghost" data-acct="out"${ACC.busy?' disabled':''}>Sign out</button></div>`;
+    return;
+  }
+  const email=document.getElementById('acct-email'),pass=document.getElementById('acct-pass');
+  const ev=email?email.value:'',pv=pass?pass.value:'';
+  el.innerHTML=`<div class="eyebrow" id="acct-h">Family account</div>
+    <p class="hint">Sign in to save this family's people, rules, tasks and requests. Without an account the prototype starts over when you leave.</p>
+    <input id="acct-email" type="email" autocomplete="email" placeholder="Email" aria-label="Email">
+    <input id="acct-pass" type="password" autocomplete="current-password" placeholder="Password (8 or more characters)" aria-label="Password" data-enter-acct="in">
+    <div class="row"><button class="btn-solid" data-acct="in"${ACC.busy?' disabled':''}>Sign in</button><button class="btn-ghost" data-acct="up"${ACC.busy?' disabled':''}>Create account</button></div>
+    ${ACC.err?`<p class="err" role="alert">${esc(ACC.err)}</p>`:''}`;
+  document.getElementById('acct-email').value=ev;document.getElementById('acct-pass').value=pv;
+}
+async function acctAction(kind){
+  if(ACC.busy)return;
+  const email=(document.getElementById('acct-email')||{}).value||'',password=(document.getElementById('acct-pass')||{}).value||'';
+  if(kind!=='out'&&(!email.trim()||!password)){ACC.err='Enter your email and password.';renderAcct();return}
+  ACC.busy=true;ACC.err='';renderAcct();
+  try{
+    if(kind==='out'){
+      clearTimeout(saveT);if(saveable()!==lastSaved)await saveNow();
+      await api('/api/auth/sign-out',{method:'POST',body:'{}'});
+      ACC.user=null;ACC.loaded=false;const d=S.device;S=initial();S.device=d;render();
+    }else{
+      const path=kind==='up'?'sign-up/email':'sign-in/email';
+      const body=kind==='up'?{email:email.trim(),password,name:email.trim().split('@')[0]}:{email:email.trim(),password};
+      const r=await api('/api/auth/'+path,{method:'POST',body:JSON.stringify(body)});
+      ACC.user=r.user;ACC.busy=false;await loadFamily();
+    }
+  }catch(e){ACC.err=e.message}
+  ACC.busy=false;renderAcct();
+}
+document.getElementById('acct').addEventListener('click',e=>{const b=e.target.closest('[data-acct]');if(b)acctAction(b.dataset.acct)});
+document.getElementById('acct').addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.dataset.enterAcct)acctAction(e.target.dataset.enterAcct)});
+(async()=>{
+  try{
+    const r=await fetch('/api/auth/get-session',{credentials:'same-origin'});
+    if(!r.ok)return;
+    const data=await r.json();
+    document.getElementById('acct').hidden=false;
+    if(data&&data.user){ACC.user=data.user;await loadFamily()}else renderAcct();
+  }catch(e){}
+})();
 render();
 </script>
 
