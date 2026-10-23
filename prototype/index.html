@@ -63,6 +63,7 @@ h1{font-family:var(--f-display);font-size:40px;line-height:1;margin:4px 0 8px;le
 .rung b{font-weight:600}
 .rung span.d{color:var(--muted);font-size:12px}
 .rung code{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+body.signed-in .rung code{visibility:hidden}
 .ctl{display:flex;flex-direction:column;gap:8px}
 .ctl label{font-weight:600;font-size:13px}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;padding:2px;background:var(--surface);gap:2px;flex-wrap:wrap}
@@ -84,6 +85,8 @@ ol.try li::marker{color:var(--accent);font-family:var(--f-mono)}
 .acct .devs li{display:flex;align-items:center;gap:8px;font-size:13px}
 .acct .devs li span{flex:1;min-width:0}
 .acct .code{font-family:var(--f-mono);font-size:20px;letter-spacing:.12em}
+.acct .warn{color:var(--warn);font-size:12px}
+.acct .pinform{display:flex;flex-direction:column;gap:6px}
 .linkbtn-sm{border:0;background:none;color:var(--accent);font-size:12px;padding:2px 0}
 
 /* Device */
@@ -508,7 +511,7 @@ function vLock(){
       <div class="pin-dots ${S.pinErr?'err':''}">${dots}</div>
       <div class="err-t">${S.pinErr?'Wrong PIN. Try again.':''}</div>
       <div class="pad">${keys}<button class="txt" data-a="pin-cancel">Cancel</button><button data-a="key" data-v="0">0</button><button class="txt" data-a="key-del">Delete</button></div>
-      <div class="hint">Prototype PIN: ${p.pin}</div>
+      ${ACC.user?'':`<div class="hint">Prototype PIN: ${p.pin}</div>`}
       ${p.rules.login==='either'?'<button class="linkbtn" data-a="use-bio">Use face or fingerprint</button>':''}
     </div></div>`;
   }
@@ -1031,7 +1034,8 @@ document.getElementById('hour').addEventListener('input',e=>{S.hour=Number(e.tar
 
 /* Family account: saves people, rules, tasks and requests to Neon through the site's /api functions.
    Hidden where there is no /api (GitHub Pages, opened as a file). */
-const ACC={user:null,loaded:false,busy:false,err:'',status:'',devices:[],code:null};
+const ACC={user:null,loaded:false,busy:false,err:'',status:'',devices:[],code:null,pinEdit:null,pinErr:''};
+const STARTER_PINS=['1111','2222','3333','4444'];
 const localDay=()=>new Date().toLocaleDateString('en-CA');
 let lastSaved='',saveT;
 const saveable=()=>JSON.stringify({
@@ -1091,6 +1095,29 @@ async function loadDevices(){
   try{ACC.devices=(await api('/api/devices')).devices.filter(d=>d.role==='family')}catch(e){ACC.devices=[]}
   renderAcct();
 }
+// PINs unlock the family's real devices, so starter and easy-to-guess PINs aren't allowed
+function pinProblem(pin,p){
+  if(!/^\d{4}$/.test(pin))return 'Use exactly 4 digits.';
+  if(STARTER_PINS.includes(pin))return "That's a starter PIN everyone can see. Choose another.";
+  if(/^(\d)\1{3}$/.test(pin)||['0123','1234','2345','3456','4567','5678','6789','9876','8765','7654','6543','5432','4321','3210'].includes(pin))return 'That PIN is too easy to guess.';
+  if(S.people.some(q=>q.id!==p.id&&q.pin===pin))return `${q2name(pin)} already uses that PIN.`;
+  return '';
+}
+const q2name=pin=>(S.people.find(q=>q.pin===pin)||{}).name||'Someone';
+function pinsHTML(){
+  const rows=S.people.filter(p=>p.pin||p.level<=2).map(p=>{
+    if(ACC.pinEdit===p.id)return `<li><div class="pinform" style="flex:1">
+      <span><b>${esc(p.name)}</b> · new PIN</span>
+      <input id="pin-new" type="password" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="New 4-digit PIN" aria-label="New PIN for ${esc(p.name)}">
+      <input id="pin-again" type="password" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="Type it again" aria-label="Confirm PIN" data-enter-acct="pin-save">
+      ${ACC.pinErr?`<p class="err" role="alert">${esc(ACC.pinErr)}</p>`:''}
+      <div class="row"><button class="btn-solid" data-acct="pin-save">Save PIN</button><button class="btn-ghost" data-acct="pin-cancel">Cancel</button></div></div></li>`;
+    const starter=STARTER_PINS.includes(p.pin);
+    return `<li><span><b>${esc(p.name)}</b> · ${LEVEL[p.level]}${starter?' · <span class="warn">starter PIN</span>':''}</span><button class="linkbtn-sm" data-acct="pin-edit" data-id="${esc(p.id)}">Change PIN</button></li>`;
+  }).join('');
+  const needs=S.people.some(p=>STARTER_PINS.includes(p.pin));
+  return `<div class="eyebrow">PINs</div>${needs?'<p class="hint warn">Everyone starts with a public demo PIN. Change them before linking a family device.</p>':''}<ul class="devs">${rows}</ul>`;
+}
 function devicesHTML(){
   const seen=d=>d.last_seen_at?`seen ${new Date(d.last_seen_at).toLocaleString([], {dateStyle:'short',timeStyle:'short'})}`:'not opened yet';
   const list=ACC.devices.length?`<ul class="devs">${ACC.devices.map(d=>`<li><span><b>${esc(d.name)}</b> · ${seen(d)}</span><button class="linkbtn-sm" data-acct="unlink" data-id="${d.id}">Remove</button></li>`).join('')}</ul>`
@@ -1100,13 +1127,17 @@ function devicesHTML(){
 }
 function renderAcct(){
   const el=document.getElementById('acct');
+  document.body.classList.toggle('signed-in',!!ACC.user);
   if(ACC.user){
+    // keep a half-typed PIN when the panel redraws (for example after an autosave)
+    const keep=['pin-new','pin-again'].map(id=>[id,(document.getElementById(id)||{}).value||'']);
     el.innerHTML=`<div class="eyebrow" id="acct-h">Family account</div>
       <p>Signed in as <b>${esc(ACC.user.email)}</b></p>
       <p class="hint" role="status">${ACC.status}. Changes to people, rules, tasks, requests and chore photos save automatically. Reset reloads your saved family.</p>
-      ${ACC.loaded?devicesHTML():''}
+      ${ACC.loaded?pinsHTML()+devicesHTML():''}
       ${ACC.err?`<p class="err" role="alert">${esc(ACC.err)}</p>`:''}
       <div class="row"><button class="btn-ghost" data-acct="out"${ACC.busy?' disabled':''}>Sign out</button></div>`;
+    keep.forEach(([id,v])=>{const el=document.getElementById(id);if(el)el.value=v});
     return;
   }
   const email=document.getElementById('acct-email'),pass=document.getElementById('acct-pass');
@@ -1120,6 +1151,15 @@ function renderAcct(){
   document.getElementById('acct-email').value=ev;document.getElementById('acct-pass').value=pv;
 }
 async function acctAction(kind,id){
+  if(kind==='pin-edit'){ACC.pinEdit=id;ACC.pinErr='';renderAcct();const el=document.getElementById('pin-new');if(el)el.focus();return}
+  if(kind==='pin-cancel'){ACC.pinEdit=null;ACC.pinErr='';renderAcct();return}
+  if(kind==='pin-save'){
+    const p=person(ACC.pinEdit),a=(document.getElementById('pin-new')||{}).value||'',b=(document.getElementById('pin-again')||{}).value||'';
+    if(!p)return;
+    ACC.pinErr=a!==b?"The two PINs don't match.":pinProblem(a,p);
+    if(!ACC.pinErr){p.pin=a;ACC.pinEdit=null;log(`${p.name}'s PIN was changed`,p.level,'system');toast(`${p.name}'s PIN changed`)}
+    render();renderAcct();return;
+  }
   if(ACC.busy)return;
   if(kind==='link'||kind==='unlink'){
     if(kind==='unlink'&&!confirm('Remove this device? It will stop working with your family until you link it again.'))return;

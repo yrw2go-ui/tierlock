@@ -1,6 +1,6 @@
 import { randomInt } from "node:crypto";
 import { getSql, isConfigured, json, sessionUser } from "./_lib/neon.js";
-import { familyForUser } from "./_lib/family.js";
+import { familyForUser, membersWithStarterPins } from "./_lib/family.js";
 
 // The signed-in parent's linked devices.
 // GET lists them, POST makes a one-time code for linking a new family device,
@@ -35,6 +35,11 @@ async function handle(request) {
     if (!/^[0-9a-f-]{36}$/.test(id)) return json({ error: "unknown device" }, 400);
     await sql`delete from devices where id = ${id} and family_id = ${family.id}`;
     return json({ ok: true });
+  }
+
+  const starter = await membersWithStarterPins(sql, family.id);
+  if (starter.length) {
+    return json({ error: `Change the starter PIN for ${starter.join(", ")} before linking a device` }, 409);
   }
 
   const code = newCode();

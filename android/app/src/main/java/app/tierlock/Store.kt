@@ -27,6 +27,23 @@ class Store(context: Context) {
         get() = prefs.getString("state", null)
         set(v) = prefs.edit().putString("state", v).apply()
 
+    // Wrong-PIN lockout, shared by everyone on the device so guesses can't be spread
+    // across people. After 5 misses: 30 s, then doubling, up to an hour.
+    val pinLockedUntil: Long get() = prefs.getLong("pinLockedUntil", 0L)
+
+    fun pinFailed(): Long = synchronized(lock) {
+        val misses = prefs.getInt("pinMisses", 0) + 1
+        val until = if (misses >= 5) {
+            System.currentTimeMillis() + minOf(30_000L shl (misses - 5).coerceAtMost(7), 3_600_000L)
+        } else 0L
+        prefs.edit().putInt("pinMisses", misses).putLong("pinLockedUntil", until).commit()
+        until
+    }
+
+    fun pinSucceeded() = synchronized(lock) {
+        prefs.edit().putInt("pinMisses", 0).putLong("pinLockedUntil", 0L).commit()
+    }
+
     fun unlink() {
         prefs.edit().clear().apply()
     }
