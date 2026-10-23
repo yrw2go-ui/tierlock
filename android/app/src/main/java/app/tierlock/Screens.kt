@@ -61,6 +61,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import kotlinx.coroutines.delay
 import androidx.core.graphics.drawable.toBitmap
 
 // Colors from the web app
@@ -302,11 +303,24 @@ private fun LockScreen(a: MainActivity) {
 private fun PinScreen(a: MainActivity, target: Screen.Pin) {
     var pin by remember(target) { mutableStateOf("") }
     var wrong by remember(target) { mutableStateOf(false) }
-    val bio = a.canUseBiometrics(target.person)
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    val bio = a.canUseBiometrics(target)
+    val waitSeconds = ((a.pinWaitUntil - now + 999) / 1000).coerceAtLeast(0)
     BackHandler { a.cancelPin() }
-    LaunchedEffect(target) { if (bio && target.person.login == "bio") a.askBiometrics(target) }
+    LaunchedEffect(target) {
+        a.refreshPinWait()
+        if (bio && target.person.login == "bio") a.askBiometrics(target)
+    }
+    // tick while locked out so the countdown updates and the keypad comes back
+    LaunchedEffect(a.pinWaitUntil) {
+        while (System.currentTimeMillis() < a.pinWaitUntil) {
+            now = System.currentTimeMillis()
+            delay(1000)
+        }
+        now = System.currentTimeMillis()
+    }
     fun press(d: String) {
-        if (pin.length >= 4) return
+        if (pin.length >= 4 || waitSeconds > 0) return
         pin += d
         wrong = false
         if (pin.length == 4) {
@@ -320,7 +334,12 @@ private fun PinScreen(a: MainActivity, target: Screen.Pin) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             repeat(4) { i -> Box(Modifier.size(14.dp).background(if (i < pin.length) Ink else Color(0xFFD3D9E2), CircleShape)) }
         }
-        Text(if (wrong) "Wrong PIN. Try again." else " ", color = Bad, fontSize = 14.sp)
+        val message = when {
+            waitSeconds > 0 -> "Too many wrong PINs. Try again in ${if (waitSeconds >= 60) "${(waitSeconds + 59) / 60} min" else "$waitSeconds s"}."
+            wrong -> "Wrong PIN. Try again."
+            else -> " "
+        }
+        Text(message, color = Bad, fontSize = 14.sp, textAlign = TextAlign.Center)
         val keys = listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "⌫")
         LazyVerticalGrid(columns = GridCells.Fixed(3), modifier = Modifier.width(280.dp), userScrollEnabled = false,
             horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {

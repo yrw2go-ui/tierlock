@@ -190,24 +190,43 @@ class MainActivity : FragmentActivity() {
     // --- lock screen ---
 
     fun pick(person: Person) {
-        if (person.login == "none" || person.pin == null) unlock(person) else screen = Screen.Pin(person)
+        // grown-ups can change rules and unlink the device, so they never get in without a PIN
+        if (!person.isGrownUp && (person.login == "none" || person.pin == null)) unlock(person) else screen = Screen.Pin(person)
     }
 
     fun openSettings(grownUp: Person) {
         screen = Screen.Pin(grownUp, forSettings = true)
     }
 
+    /** Millis until another PIN may be tried; 0 when unlocked. */
+    var pinWaitUntil by mutableStateOf(0L)
+        private set
+
     fun pinEntered(target: Screen.Pin, pin: String): Boolean {
-        if (pin != target.person.pin) return false
+        if (System.currentTimeMillis() < store.pinLockedUntil) return false
+        if (target.person.pin == null || pin != target.person.pin) {
+            pinWaitUntil = store.pinFailed()
+            return false
+        }
+        store.pinSucceeded()
+        pinWaitUntil = 0L
         if (target.forSettings) screen = Screen.Settings else unlock(target.person)
         return true
     }
 
-    fun canUseBiometrics(person: Person) =
-        person.login in setOf("bio", "either") &&
+    fun refreshPinWait() {
+        pinWaitUntil = store.pinLockedUntil
+    }
+
+    // Android only confirms that *an* enrolled fingerprint or face matched, not whose,
+    // so it's offered to children only, never to grown-ups or for device settings.
+    fun canUseBiometrics(target: Screen.Pin) =
+        !target.forSettings && !target.person.isGrownUp &&
+            target.person.login in setOf("bio", "either") &&
             BiometricManager.from(this).canAuthenticate(BIOMETRIC_WEAK) == BiometricManager.BIOMETRIC_SUCCESS
 
     fun askBiometrics(target: Screen.Pin) {
+        if (!canUseBiometrics(target)) return
         val prompt = BiometricPrompt(this, ContextCompat.getMainExecutor(this), object : BiometricPrompt.AuthenticationCallback() {
             override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                 if (target.forSettings) screen = Screen.Settings else unlock(target.person)

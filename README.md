@@ -40,7 +40,7 @@ A signed-in parent taps **Link a family device** to get a one-time 8-character c
 - `GET /api/device/state?day=YYYY-MM-DD`: people (with PINs and rules), tasks, requests and today's screen time
 - `POST /api/device/usage`: `{day, entries: [{member, app, minutes}]}`, cumulative minutes per person and app for that day
 
-Parents see linked devices in the Family account panel and can remove one, which stops its token at once. The prototype shows each person's screen time used today from these reports.
+Parents see linked devices in the Family account panel and can remove one, which stops its token at once. Everyone starts with the prototype's public demo PINs (1111 to 4444); a parent changes them under **PINs** in the same panel, and devices can't be linked until no one uses a starter PIN. Owners and managers must have a PIN, and once a device is linked the starter PINs can't come back. The prototype shows each person's screen time used today from these reports.
 
 ## Android app
 
@@ -50,6 +50,8 @@ At setup the device is either:
 
 - **Parent device**: shows the parent controls (the web app) with no locks.
 - **Family device**: links to a family with a parent's one-time code, becomes the home screen, and shows "Who's using this?". Each person unlocks with their PIN (or fingerprint/face if their login allows it) and sees only the apps their rules allow; owners and managers see every app. Grown-ups can open device settings from the lock screen with their PIN. The device locks itself when the screen turns off.
+
+Owners and managers always unlock with their PIN; fingerprint or face is offered only to children, because Android can't tell whose finger matched. After 5 wrong PINs the keypad waits 30 seconds, doubling with each further miss up to an hour.
 
 With usage access turned on, the app counts each person's minutes per app and sends them to Neon every 15 minutes, so the web app shows screen time used today.
 

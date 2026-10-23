@@ -45,3 +45,12 @@ export async function familyData(sql, familyId, day) {
     screenTime,
   };
 }
+
+// The prototype's starter PINs are public (README, demo), so a family can't link
+// devices or keep devices linked while anyone still uses one.
+export const STARTER_PINS = new Set(["1111", "2222", "3333", "4444"]);
+
+export async function membersWithStarterPins(sql, familyId) {
+  const rows = await sql`select name, pin from members where family_id = ${familyId} and pin is not null`;
+  return rows.filter((m) => STARTER_PINS.has(m.pin)).map((m) => m.name);
+}

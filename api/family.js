@@ -1,5 +1,5 @@
 import { getSql, isConfigured, json, sessionUser } from "./_lib/neon.js";
-import { familyData, familyForUser } from "./_lib/family.js";
+import { familyData, familyForUser, STARTER_PINS } from "./_lib/family.js";
 import { deletePhotos, storageConfigured } from "./_lib/storage.js";
 
 // The signed-in parent's family: people with their rules, tasks and requests.
@@ -57,6 +57,15 @@ async function save(sql, userId, body) {
   }
   const family = await familyForUser(sql, userId);
   const prefix = family ? `${family.id}/` : null;
+  // grown-ups unlock the family's devices, so they always need a PIN; once a device
+  // is linked, nobody may go back to a starter PIN
+  if (people.some((p) => p.level <= 2 && (!p.pin || p.rules.login === "none"))) {
+    return json({ error: "owners and managers need a PIN" }, 400);
+  }
+  if (family && people.some((p) => p.pin && STARTER_PINS.has(p.pin))) {
+    const [linked] = await sql`select 1 from devices where family_id = ${family.id} limit 1`;
+    if (linked) return json({ error: "choose a PIN other than the starter PINs" }, 400);
+  }
   const ids = new Set(people.map((p) => p.id));
   if (ids.size !== people.length || !tasks.every((t) => validTask(t, ids, prefix)) ||
       !requests.every((q) => validRequest(q, ids))) {
